@@ -1,24 +1,33 @@
 import Data.ByteString as B
 import Crypto.Hash.SHA1 (hash)
 
-
-data ObjectType = TCommit | TTree | TBlob deriving (Eq)
+type ObjectId = String  
+data ObjectType = "commit" | TTree | TBlob deriving (Eq)
 
 instance Show ObjectType where
-	show TCommit = "Commit"
-	show TTree   = "Tree"
-	show TBlob   = "Blob"
+	show TCommit = "commit"
+	show TTree   = "tree"
+	show TBlob   = "blob"
 
 data Object = Object {
-	getBlob :: B.ByteString
-   ,type    :: ObjectType
-   ,hash    :: 	
+    objType    :: ObjectType
+   ,hash       :: ObjectId	
 } 
 data Commit = Commit {
-	tree     :: B.ByteString,
-	parents  :: [B.ByteString]
-	hash     :: B.ByteString
-	author   :: String
-	commiter :: String
-	message  :: String
+	tree     :: B.ByteString
+   ,parents  :: [B.ByteString]
+   ,hash     :: B.ByteString
+   ,author   :: B.ByteString
+   ,commiter :: B.ByteString
+   ,message  :: B.ByteString
+}
+
+data Tree = Tree{
+	hash    :: ObjectId
+   ,entries :: [TreeEntry]
+}
+
+data TreeEntry = TreeEntry {
+	hash    :: ObjectId
+
 }
