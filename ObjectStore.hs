@@ -10,8 +10,8 @@ type FileName = String
 type Repo = String
 
 getObjPath :: Repo -> O.ObjectId -> (FilePath, FileName)
-getObjPath [] = ("","")
-getObjPath o = "objects/" </> (take 2 o) </> (drop 2 o)
+getObjPath r o = (r </> ".git" </> objects  </> (take 2 o), (drop 2 o))
+getObjPath _ _ = ("","")
 
 
 hashContent :: O.ObjectType -> C.ByteString -> (O.ObjectId, C.ByteString)
