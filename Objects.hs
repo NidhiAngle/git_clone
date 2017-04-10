@@ -1,33 +1,40 @@
+module Objects (
+  Commit(..)
+  ,Object(..)
+  ,ObjectId
+  ,ObjectType(..)
+  ,Tree(..)
+  ,TreeEntry(..)
+) where 
 import Data.ByteString as B
-import Crypto.Hash.SHA1 (hash)
 
 type ObjectId = String  
-data ObjectType = "commit" | TTree | TBlob deriving (Eq)
+data ObjectType = TCommit | TTree | TBlob deriving (Eq)
 
 instance Show ObjectType where
-	show TCommit = "commit"
-	show TTree   = "tree"
-	show TBlob   = "blob"
+  show TCommit = "commit"
+  show TTree   = "tree"
+  show TBlob   = "blob"
 
 data Object = Object {
-    objType    :: ObjectType
-   ,hash       :: ObjectId	
+  objType    :: ObjectType
+ ,objHash    :: ObjectId
 } 
 data Commit = Commit {
-	tree     :: B.ByteString
-   ,parents  :: [B.ByteString]
-   ,hash     :: B.ByteString
-   ,author   :: B.ByteString
-   ,commiter :: B.ByteString
-   ,message  :: B.ByteString
+  tree     :: B.ByteString
+ ,parents  :: [B.ByteString]
+ ,commitHash     :: B.ByteString
+ ,author   :: B.ByteString
+ ,message  :: B.ByteString
 }
 
 data Tree = Tree{
-	hash    :: ObjectId
-   ,entries :: [TreeEntry]
+  treeHash    :: ObjectId
+ ,entries     :: [TreeEntry]
 }
 
 data TreeEntry = TreeEntry {
-	hash    :: ObjectId
+  entryHash    :: ObjectId
 
 }
+
