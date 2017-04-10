@@ -4,6 +4,15 @@ import Crypto.Hash
 import Data.ByteString.Char8 as C
 import qualified Objects as O
 import Text.Printf (printf)
+import System.FilePath
+
+type FileName = String
+type Repo = String
+
+getObjPath :: Repo -> O.ObjectId -> (FilePath, FileName)
+getObjPath [] = ("","")
+getObjPath o = "objects/" </> (take 2 o) </> (drop 2 o)
+
 
 hashContent :: O.ObjectType -> C.ByteString -> (O.ObjectId, C.ByteString)
 hashContent objType content = do
@@ -23,4 +32,4 @@ hexSha3_512 bs = show (hash bs :: Digest SHA3_512)
 
 
 
-yo = Prelude.putStrLn "hi"
+hi = Prelude.putStrLn "hi"

@@ -37,4 +37,4 @@ data TreeEntry = TreeEntry {
   entryHash    :: ObjectId
 
 }
-
+yo = Prelude.putStrLn "hi"
