@@ -40,7 +40,7 @@ hexSha3_512 bs = "89abcdefghijklmnopqlksnghmamnfajehrkajkg"
 --hexSha3_512 bs = show (hash bs :: Digest SHA3_512)
 -------------------------------------------------------------------
 
---writeObject :: Repo -> C.ByteString -> O.ObjectType -> IO ()
+writeObject :: Repo -> C.ByteString -> O.ObjectType -> IO ()
 writeObject r c t = do
     let (path, name, content) = exportObject r c t
     _ <- path >>= (createDirectoryIfMissing True)  
@@ -53,3 +53,12 @@ writeObject r c t = do
 hi = Prelude.putStrLn "hi"
 
 
+readObject GitRepository{..} sha = do
+    let (path, name) = pathForObject getName sha
+        filename     = path </> name
+    exists <- doesFileExist filename
+    if exists then do
+        bs <- C.readFile filename
+        return $ parseObject sha $ inflate bs
+    else return Nothing
+    where inflate blob = B.concat . L.toChunks . Z.decompress $ L.fromChunks [blob]
