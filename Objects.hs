@@ -4,11 +4,10 @@ module Objects (
   ,ObjectId
   ,ObjectType(..)
   ,Tree(..)
-  ,TreeEntry(..)
 ) where 
 import Data.ByteString as B
 
-type ObjectId = String  
+type ObjectId = B.ByteString  
 data ObjectType = TCommit | TTree | TBlob deriving (Eq)
 
 instance Show ObjectType where
@@ -16,25 +15,22 @@ instance Show ObjectType where
   show TTree   = "tree"
   show TBlob   = "blob"
 
-data Object = Object {
-  objType    :: ObjectType
- ,objHash    :: ObjectId
-} 
+data Object = CommitObj Commit | TreeObject Tree | BlobObj Blob
+
+--hashObject (CommitObj c) = hashCommit c
+
 data Commit = Commit {
-  tree     :: B.ByteString
- ,parents  :: [B.ByteString]
- ,commitHash     :: B.ByteString
+  tree     :: ObjectId
+ ,parents  :: [ObjectId]
  ,author   :: B.ByteString
  ,message  :: B.ByteString
 }
 
 data Tree = Tree{
-  treeHash    :: ObjectId
- ,entries     :: [TreeEntry]
+ entries     :: [(String, ObjectId)]
 }
 
-data TreeEntry = TreeEntry {
-  entryHash    :: ObjectId
-
+data Blob = Blob{
+ content     :: B.ByteString
 }
-yo = Prelude.putStrLn "hi"
+

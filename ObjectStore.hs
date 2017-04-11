@@ -2,7 +2,7 @@
 {-# LANGUAGE PackageImports        #-}
 
 module ObjectStore where
---import "cryptohash" Crypto.Hash
+import "cryptohash" Crypto.Hash
 import Data.ByteString.Char8 as C
 import qualified Objects as O
 import Text.Printf (printf)
@@ -38,8 +38,8 @@ exportObject r content objtype = do
 
 
 hexSha3_512 :: ByteString -> String
-hexSha3_512 bs = "89abcdefghijklmnopqlksnghmamnfajehrkajkg"
---hexSha3_512 bs = show (hash bs :: Digest SHA3_512)
+--hexSha3_512 bs = "89abcdefghijklmnopqlksnghmamnfajehrkajkg"
+hexSha3_512 bs = show (hash bs :: Digest SHA3_512)
 -------------------------------------------------------------------
 
 writeObject :: Repo -> C.ByteString -> O.ObjectType -> IO ()

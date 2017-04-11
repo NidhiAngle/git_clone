@@ -6,7 +6,7 @@ module GitRevisions (Rev, revParseTree, CaretQualifier(Head,Exclamation,Index,
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-class (Ord a) => Rev a where
+class (Ord a, Show a) => Rev a where
   getParents :: a -> Set a
 
 data CaretQualifier = Head | Exclamation | Index Int | Dash Int
@@ -27,9 +27,11 @@ data RevArg a = RevId a |
                  Caret a CaretQualifier
 
 -- | Returns all the ancestors of Rev x along with x
+-- | !!! Make sure to not add parents multiple times
 getAllAncestors :: (Rev a) => a -> Set a
-getAllAncestors x = case Set.toList $ getAllAncestors x of
+getAllAncestors x = case Set.toList $ getParents x of
                       [] -> Set.empty
+                      -- Change to Set.unions
                       xs -> foldr (\y acc -> getAllAncestors y `Set.union` acc) 
                               (Set.singleton x) xs 
 {- 

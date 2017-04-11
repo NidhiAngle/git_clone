@@ -2,3 +2,4 @@ GIT CLONE
 
 Dependencies
 cabal install cryptohash
+cabal install zlib
