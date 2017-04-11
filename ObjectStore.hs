@@ -35,8 +35,7 @@ exportObject r content objtype = do
       path  = getObjPath r id
   (return (takeDirectory path), return path, return content)
 
-importObject :: MonadIO m => Repo -> O.ObjectId -> m ( Maybe Object)
-importObject r o = 
+
 
 hexSha3_512 :: ByteString -> String
 hexSha3_512 bs = "89abcdefghijklmnopqlksnghmamnfajehrkajkg"
