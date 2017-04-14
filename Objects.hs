@@ -1,7 +1,6 @@
 module Objects (
    Object(..)
   ,ObjectId
-  ,ObjectType(..)
   ,toLineTree
   ,toLineBlob
   ,toLineCommit
@@ -9,10 +8,9 @@ module Objects (
 import Data.ByteString.Char8 as C
 
 type ObjectId = C.ByteString  
-data TreeEntryType = TTree | TBlob deriving (Eq)
+data EntryType = TTree | TBlob deriving (Eq)
 
-instance Show ObjectType where
-  show TCommit = "commit"
+instance Show EntryType where
   show TTree   = "tree"
   show TBlob   = "blob"
 
@@ -28,7 +26,7 @@ data Commit = Commit {
 }
 
 data Tree = Tree{
- entries  :: [(String, ObjectId, ObjectType)] -- same object id but different file names
+ entries  :: [(String, ObjectId, EntryType)] -- same object id but different file names
                                                  -- to prevent commit in tree
 }
 
@@ -51,10 +49,9 @@ toLineCommit _ c        = (C.pack "Unexpected property\n")
 -- put in object?
 toLineTree :: Tree -> C.ByteString 
 toLineTree t = writeEntries (entries t) where
-  writeEntries []                       = C.pack ""
+  writeEntries []                     = C.pack ""
   writeEntries ((name, id, TBlob):es) = (C.pack "blob ") `C.append` id `C.append` (C.pack (name++"\n")) 
   writeEntries ((name, id, TTree):es) = (C.pack "tree ") `C.append` id `C.append` (C.pack (name++"\n"))
-  writeEntries _                        = (C.pack "Unexpected property\n")
 
 -- pretty printer for commit objects, for example, to write to files
 -- put in object?
