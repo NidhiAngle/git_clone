@@ -28,21 +28,28 @@ objToByte (O.CommitObj c) = (O.toLineCommit "parent" c) `C.append` (O.toLineComm
 objToByte (O.TreeObj t)   = O.toLineTree t
 objToByte (O.BlobObj b)   = O.toLineBlob b
 
--- Given object type and the content, adds header and hashes to give
+
+-- Given object, adds header and hashes to give
 -- id and new content
-hashContent :: O.ObjectType -> C.ByteString -> (O.ObjectId, C.ByteString)
-hashContent objType content = do
-  let header           = getHeader (C.pack (show objType)) 
+hashContent :: O.Object-> (O.ObjectId, C.ByteString)
+hashContent obj = do
+  let content          = objToByte obj
+      header           = getHeader obj ((show . C.length) content)
       headerAndContent = header `C.append` content
       id               = hexSha3_512 headerAndContent
   (id, headerAndContent) 
   where 
-      getHeader objType  = objType `C.append` (C.pack " ") `C.append` (C.pack (show (C.length content))) `C.append` (C.pack "\0")
+      getHeader (CommitObj c) l = getHeader (C.pack "commit ") `C.append`
+                                  (C.pack (l++"\0"))
+      getHeader (TreeObj c) l   = getHeader (C.pack "tree ") `C.append`
+                                  (C.pack (l++"\0"))
+      getHeader (BlobObj c) l   = getHeader (C.pack "blob ") `C.append`
+                                  (C.pack (l++"\0"))                                                  
 
 
-exportObject :: Monad m => Repo -> C.ByteString -> O.ObjectType -> (m FilePath,m FilePath, m C.ByteString)
-exportObject r content objtype = do
-  let (id, content) = hashContent objtype content
+exportObject :: Monad m => Repo -> O.Object -> (m FilePath,m FilePath, m C.ByteString)
+exportObject r  = do
+  let (id, content) = hashContent obj
       path  = getObjPath r id
   (return (takeDirectory path), return path, return content)
 

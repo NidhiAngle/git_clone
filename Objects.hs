@@ -9,7 +9,7 @@ module Objects (
 import Data.ByteString.Char8 as C
 
 type ObjectId = C.ByteString  
-data ObjectType = TCommit | TTree | TBlob deriving (Eq)
+data TreeEntryType = TTree | TBlob deriving (Eq)
 
 instance Show ObjectType where
   show TCommit = "commit"
