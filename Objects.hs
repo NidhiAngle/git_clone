@@ -49,9 +49,9 @@ bytestr s = string $ C.pack s
 nl :: PB.Parser ByteString
 nl = string $ C.pack "\n"
 
-parseCommit :: PB.Parser Commit 
-parseCommit = do
-  parents <- many1 parseParent
+--parseCommit :: PB.Parser Commit 
+--parseCommit = do
+--  parents <- many1 parseParent
 
 parseParent :: PB.Parser C.ByteString
 parseParent = do

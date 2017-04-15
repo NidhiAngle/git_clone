@@ -2,7 +2,7 @@
 {-# LANGUAGE PackageImports        #-}
 
 module ObjectStore where
---import "cryptonite" Crypto.Hash
+import "cryptohash" Crypto.Hash
 import Data.ByteString.Char8 as C
 import qualified Objects as O
 import Text.Printf (printf)
@@ -20,9 +20,8 @@ type Repo = String
 getObjPath :: Repo -> O.ObjectId -> FilePath
 getObjPath r o = (r </> ".git" </> "objects"  </> (Prelude.take 2 (C.unpack o)) </> (Prelude.drop 2 (C.unpack o)))
 
-hexSha3_512 :: ByteString -> C.ByteString
-hexSha3_512 bs = C.pack "89abcdefghijklmnopqlksnghmamnfajehrkajkg"
---hexSha3_512 bs = show (hash bs :: Digest SHA3_512)
+hexSha256 :: ByteString -> ByteString
+hexSha256 bs = digestToHexByteString ((hash bs) :: Digest SHA256)
 
 -- Given object, adds header and hashes to give
 -- id and new content
@@ -31,7 +30,7 @@ hashContent obj = do
   let content          = objToByte obj
       header           = getHeader obj ((show . C.length) content)
       headerAndContent = header `C.append` content
-      id               = hexSha3_512 headerAndContent
+      id               = hexSha256 headerAndContent
   (id, headerAndContent) 
   where 
       getHeader (O.CommitObj c) l = (C.pack "commit ") `C.append`
