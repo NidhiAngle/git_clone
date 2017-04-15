@@ -12,6 +12,9 @@ import Control.Monad.IO.Class
 import System.Directory
 import qualified Codec.Compression.Zlib as Zlib
 import qualified Data.ByteString.Lazy as B
+import Control.Applicative ((<|>))
+import Data.Attoparsec.ByteString.Char8 as PB
+
 
 
 type Repo = String
@@ -53,6 +56,11 @@ exportObject r obj= do
   let (id, content) = hashContent obj
       path  = getObjPath r id
   (return (takeDirectory path), return path, return content)
+
+parseObject :: Parser O.Object
+parseObject = fmap O.CommitObj O.parseCommit <|> 
+              fmap O.TreeObj O.parseTree <|> 
+              fmap O.BlobObj O.parseBlob
 
 -- importObject :: Monad m => m C.ByteString -> m FilePath -> O.Object
 -- importObject

@@ -1,22 +1,26 @@
 module Objects (
    Object(..)
-  ,Commit(..)-- COMMENT OUT LATER
-  ,Tree(..)-- COMMENT OUT LATER
-  ,Blob(..)-- COMMENT OUT LATER
+  --,Commit(..)-- COMMENT OUT LATER
+  --,Tree(..)-- COMMENT OUT LATER
+  --,Blob(..)-- COMMENT OUT LATER
   ,ObjectId
   ,toLineTree
   ,toLineBlob
   ,toLineCommit
   ,parseBlob
+  ,parseCommit
+  ,parseTree
 ) where 
 import Data.ByteString.Char8 as C
 import Data.Attoparsec.ByteString.Char8 as PB
+import Control.Applicative ((<|>))
 -- import Parser as PB
 -- import qualified ParserCombinators as PB
 --PARSER- BYTES TO STRING TO BYTES TO STORE 
 --remove Blob export
 
-type ObjectId = C.ByteString  
+type ObjectId = C.ByteString
+type Name = String  
 data EntryType = TTree | TBlob deriving (Eq)
 
 instance Show EntryType where
@@ -35,7 +39,7 @@ data Commit = Commit {
 }
 
 data Tree = Tree{
- entries  :: [(String, ObjectId, EntryType)] -- same object id but different file names?
+ entries  :: [(EntryType, ObjectId, Name)] -- same object id but different file names?
                                                  -- to prevent commit in tree
 }
 
@@ -46,18 +50,46 @@ data Blob = Blob{
 bytestr :: String -> PB.Parser ByteString
 bytestr s = string $ C.pack s
 
-nl :: PB.Parser ByteString
-nl = string $ C.pack "\n"
+constP :: String -> a -> PB.Parser a
+constP s a = fmap (const a) (bytestr s)
 
-parseCommit :: PB.Parser Commit 
-parseCommit = do
-  parents <- many1 parseParent
+nls :: PB.Parser ByteString
+nls = string (C.pack "\n") <|> string (C.pack " ")
+
 
 parseParent :: PB.Parser C.ByteString
 parseParent = do
   pid <- bytestr "parent " *> takeTill (== '\n')
-  nl
+  nls
   pure $ pid
+
+parseEntry :: PB.Parser (EntryType, ObjectId, Name)
+parseEntry = do
+  etype <- constP "blob " TBlob <|> constP "tree " TTree
+  id    <- takeTill (== ' ')
+  nls
+  name  <- fmap C.unpack $ takeTill (== '\n') 
+  nls
+  pure $ (etype, id, name)
+
+parseCommit :: PB.Parser Commit 
+parseCommit = do
+  parents <- many' parseParent
+  tree    <- bytestr "tree " *> takeTill (== '\n')
+  nls
+  author  <- bytestr "author " *> takeTill (== '\n')
+  nls
+  nls
+  msg     <- takeTill (== '\n')
+  nls
+  pure $ Commit parents tree author msg
+
+parseTree :: PB.Parser Tree
+parseTree = do
+  entries <- many' parseEntry
+  pure $ Tree entries
+
+
 
 parseBlob :: PB.Parser Blob
 parseBlob = do
@@ -80,8 +112,8 @@ toLineCommit _ c        = (C.pack "Unexpected property\n")
 toLineTree :: Tree -> C.ByteString 
 toLineTree t = writeEntries (entries t) where
   writeEntries []                     = C.pack ""
-  writeEntries ((name, id, TBlob):es) = (C.pack "blob ") `C.append` id `C.append` (C.pack (name++"\n")) 
-  writeEntries ((name, id, TTree):es) = (C.pack "tree ") `C.append` id `C.append` (C.pack (name++"\n"))
+  writeEntries ((TBlob, id , name):es) = (C.pack "blob ") `C.append` id `C.append` (C.pack (name++"\n")) 
+  writeEntries ((TTree, id, name):es) = (C.pack "tree ") `C.append` id `C.append` (C.pack (name++"\n"))
 
 -- pretty printer for commit objects, for example, to write to files
 -- put in object?
