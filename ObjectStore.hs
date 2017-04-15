@@ -54,13 +54,13 @@ exportObject r obj= do
       path  = getObjPath r id
   (return (takeDirectory path), return path, return content)
 
---importObject :: Monad m => m C.ByteString -> O.ObjectType -> C.ByteString
-
+-- importObject :: Monad m => m C.ByteString -> m FilePath -> O.Object
+-- importObject
 
 -------------------------------------------------------------------
 
-writeObject :: Repo -> O.Object -> IO ()
-writeObject r o = do
+writeObjectToFile :: Repo -> O.Object -> IO ()
+writeObjectToFile r o = do
     let (path, name, content) = exportObject r o
     _ <- path >>= (createDirectoryIfMissing True)  
     (name >>= (return . B.writeFile)) <*> (compress content) 
@@ -68,6 +68,12 @@ writeObject r o = do
     where
         compress :: IO C.ByteString -> IO B.ByteString
         compress mx =  mx >>= (\x -> return ((Zlib.compress . B.fromChunks) [x]))
+
+writeObject :: Repo -> O.Object -> IO String
+writeObject r o = do
+    let (path, name, content) = exportObject r o
+    content >>= (return . show) 
+ -- Why cant I use (putStr . show) even after changing to IO ()
     
 hi = Prelude.putStrLn "hi"
 
