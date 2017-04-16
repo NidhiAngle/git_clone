@@ -48,8 +48,7 @@ hashContent obj = do
 
 -- Consolidates a object type to a bytestring
 objToByte :: O.Object -> C.ByteString
-objToByte (O.CommitObj c) = (O.toLineCommit "parent" c) `C.append` (O.toLineCommit "tree" c) `C.append` 
-                            (O.toLineCommit "author" c) `C.append` (O.toLineCommit "msg" c)
+objToByte (O.CommitObj c) = O.toLineCommit c
 objToByte (O.TreeObj t)   = O.toLineTree t
 objToByte (O.BlobObj b)   = O.toLineBlob b
 
@@ -59,6 +58,9 @@ exportObject r obj= do
       path  = getObjPath r id
   (return (takeDirectory path), return path, return content)
 
+parseHeader :: String -> Parser ByteString
+parseHeader str = O.bytestr str *> takeTill (=='\0')
+-- DONT FORGET TO ADD THIS
 parseObject :: Parser O.Object
 parseObject = fmap O.CommitObj O.parseCommit <|> 
               fmap O.TreeObj O.parseTree <|> 
@@ -71,8 +73,8 @@ readObject str = case parseOnly parseObject str of
 
 importObject :: Monad m => m ByteString -> m (Maybe O.Object)
 importObject = fmap readObject 
+------------------------------------------------
 
-hi = Prelude.putStr "hi"
 
 -------------------------------------------------------------------
 
