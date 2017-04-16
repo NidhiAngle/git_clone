@@ -1,9 +1,10 @@
 module Objects (
    Object(..)
-  --,Commit(..)-- COMMENT OUT LATER
-  --,Tree(..)-- COMMENT OUT LATER
-  --,Blob(..)-- COMMENT OUT LATER
   ,ObjectId
+  ,EntryType
+  ,makeCommit
+  ,makeTree-- COMMENT OUT LATER
+  ,makeBlob-- COMMENT OUT LATER
   ,toLineTree
   ,toLineBlob
   ,toLineCommit
@@ -20,7 +21,7 @@ import Control.Applicative ((<|>))
 --remove Blob export
 
 type ObjectId = C.ByteString
-type Name = String  
+type Name = C.ByteString  
 data EntryType = TTree | TBlob deriving (Eq)
 
 instance Show EntryType where
@@ -47,6 +48,15 @@ data Blob = Blob{
  content :: C.ByteString
 }
 
+makeCommit p t a m = Commit p t a m
+
+makeTree e = Tree $ Prelude.map change e
+  where change ("tree", i, n) = (TTree, i, n)
+        change (_, i, n) = (TBlob, i, n)
+
+makeBlob b = Blob b
+
+
 bytestr :: String -> PB.Parser ByteString
 bytestr s = string $ C.pack s
 
@@ -68,7 +78,7 @@ parseEntry = do
   etype <- constP "blob " TBlob <|> constP "tree " TTree
   id    <- takeTill (== ' ')
   nls
-  name  <- fmap C.unpack $ takeTill (== '\n') 
+  name  <- takeTill (== '\n') 
   nls
   pure $ (etype, id, name)
 
@@ -112,10 +122,11 @@ toLineCommit _ c        = (C.pack "Unexpected property\n")
 toLineTree :: Tree -> C.ByteString 
 toLineTree t = writeEntries (entries t) where
   writeEntries []                     = C.pack ""
-  writeEntries ((TBlob, id , name):es) = (C.pack "blob ") `C.append` id `C.append` (C.pack (name++"\n")) 
-  writeEntries ((TTree, id, name):es) = (C.pack "tree ") `C.append` id `C.append` (C.pack (name++"\n"))
+  writeEntries ((TBlob, id , name):es) = (C.pack "blob ") `C.append` id `C.append` name `C.append` (C.pack "\n")
+  writeEntries ((TTree, id, name):es) = (C.pack "tree ") `C.append` id `C.append` name `C.append` (C.pack "\n")
 
 -- pretty printer for commit objects, for example, to write to files
 -- put in object?
 toLineBlob :: Blob -> C.ByteString
 toLineBlob = content
+
