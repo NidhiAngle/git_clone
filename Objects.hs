@@ -116,7 +116,7 @@ toLineCommit c = (Prelude.foldl (\b x -> b `C.append` (helper "parent " x)) (C.p
                  `C.append` (helper "author " (author c)) 
                  `C.append` (helper "msg" (message c))
   where
-    helper "msg" x    = (C.pack "\n") `C.append` x `C.append` (C.pack "\n")
+    helper "msg" x = (C.pack "\n") `C.append` x `C.append` (C.pack "\n")
     helper str x   = (C.pack str) `C.append` x `C.append` (C.pack "\n")
 
 

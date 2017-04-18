@@ -30,3 +30,7 @@ readObjectFromFile r id = do
     return $ OS.readObject $ inflate bs
   else return Nothing
   where inflate blob = C.concat . B.toChunks . Zlib.decompress $ B.fromChunks [blob] 
+
+createEmptyRepo :: OS.Repo -> IO ()
+createEmptyRepo repo = Prelude.mapM_ (createDirectoryIfMissing True) folders
+    where folders = [repo ++ "/.git/objects", repo ++ "/.git/refs"]

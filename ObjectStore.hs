@@ -17,10 +17,15 @@ import Control.Monad ()
 import Control.Applicative ((<|>))
 import Data.Attoparsec.ByteString.Char8 as PB
 
-
+data Ref = Ref {
+  refName :: C.ByteString
+ ,refId   :: O.ObjectId
+}
 
 type Repo = String
 
+makeRef :: C.ByteString -> O.ObjectId -> Ref
+makeRef name id = Ref name id 
 -- Given the name of the repository and id, this gives you the filepath
 getObjPath :: Repo -> O.ObjectId -> FilePath
 getObjPath r o = (r </> ".git" </> "objects"  </> (Prelude.take 2 (C.unpack o)) </> (Prelude.drop 2 (C.unpack o)))
@@ -60,7 +65,7 @@ exportObject r obj= do
 
 parseHeader :: String -> Parser ByteString
 parseHeader str = O.bytestr str *> takeTill (=='\0')
--- DONT FORGET TO ADD THIS
+
 parseObject :: Parser O.Object
 parseObject = (parseHeader "commit") *> fmap O.CommitObj O.parseCommit <|> 
               (parseHeader "tree") *> fmap O.TreeObj O.parseTree <|> 
@@ -72,7 +77,8 @@ readObject str = case parseOnly parseObject str of
   _         -> Nothing
 
 importObject :: Monad m => m ByteString -> m (Maybe O.Object)
-importObject = fmap readObject 
+importObject = fmap readObject
+ 
 ------------------------------------------------
 
 
