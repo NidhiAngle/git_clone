@@ -25,7 +25,8 @@ writeObject r o = do
     let (path, name, content) = OS.exportObject r o
     fmap show content 
  -- Why cant I use (putStr . show) even after changing to IO ()
-    
+commit = O.makeCommit [C.pack "PARENT ID"] (C.pack "TREE ID") (C.pack "AUTHOR") (C.pack "MSG")
+
 readObjectFromFile :: OS.Repo -> O.ObjectId -> IO (Maybe O.Object)
 readObjectFromFile r id = do 
   let filename = OS.getObjPath r id 
@@ -67,6 +68,7 @@ initialize r ref = do
   else do
     createEmptyRepo r
     Prelude.putStrLn "Initializing git directory"
+    Prelude.writeFile (r ++ "/.git/refs/HEAD") "refs: refs/heads/master"
     return ref
   
 userInterface :: IO()

@@ -14,8 +14,15 @@ emptyTree = makeTree []
 emptyParentCommit = makeCommit [] (C.pack "TREE ID") (C.pack "AUTHOR") (C.pack "MSG")
 blob = makeBlob $ C.pack "Hi there everyone! Welcome to our git clone."
 
-commitStr= C.pack "parent PARENT1\nparent PARENT2\ntree TREE\nauthor AUTHOR\n\nmsg MSG\n"
+commitStr = C.pack "parent PARENT1\nparent PARENT2\ntree TREE\nauthor AUTHOR\n\nmsg MSG\n"
 commitWOParentStr = C.pack "tree TREE\nauthor AUTHOR\n\nmsg MS\n"
-treeStr = C.pack "blob BLOB1 first\nblob BLOB2 sec\ntree TREE third\n"
+treeStr   = C.pack "blob BLOB1 first\nblob BLOB2 sec\ntree TREE third\n"
 emptytreeStr = C.pack ""
-blobStr = C.pack "Hi there everyone! Welcome to our git clone."
+blobStr   = C.pack "Hi there everyone! Welcome to our git clone."
+
+-- exportObject :: Monad m => Repo -> O.Object -> (m FilePath,m FilePath, m C.ByteString)
+-- importObject :: Monad m => m ByteString -> m (Maybe O.Object)
+
+
+-- exportObjectTests = TestList[
+--     OS.exportObject "TEST" commit ]
