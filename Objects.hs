@@ -1,6 +1,7 @@
 module Objects (
    Object(..)
   ,ObjectId
+  ,ObjectName
   ,EntryType
   ,makeCommit
   ,makeTree-- COMMENT OUT LATER
@@ -12,6 +13,8 @@ module Objects (
   ,parseCommit
   ,parseTree
   ,bytestr
+  ,makeBlobEntryType
+  ,makeTreeEntryType
 
 ) where 
 import Data.ByteString.Char8 as C
@@ -23,7 +26,7 @@ import Control.Applicative ((<|>))
 --remove Blob export
 
 type ObjectId = C.ByteString
-type Name = C.ByteString  
+type ObjectName = C.ByteString  
 data EntryType = TTree | TBlob deriving (Eq)
 
 instance Show EntryType where
@@ -42,7 +45,7 @@ data Commit = Commit {
 }
 
 data Tree = Tree{
- entries  :: [(EntryType, ObjectId, Name)] -- same object id but different file names?
+ entries  :: [(EntryType, ObjectId, ObjectName)] -- same object id but different file names?
                                                  -- to prevent commit in tree
 }
 
@@ -50,16 +53,17 @@ data Blob = Blob{
  content :: C.ByteString
 }
 
-makeCommit :: [ObjectId]-> ObjectId -> ByteString -> ByteString -> Commit
-makeCommit = Commit
+makeCommit :: [ObjectId]-> ObjectId -> ByteString -> ByteString -> Object
+makeCommit ps n a m= CommitObj $ Commit ps n a m
 
-makeTree :: [(String, ObjectId, Name)] -> Tree
-makeTree e = Tree $ Prelude.map change e
-  where change ("tree", i, n) = (TTree, i, n)
-        change (_, i, n) = (TBlob, i, n)
+makeTree :: [(EntryType, ObjectId, ObjectName)] -> Object
+makeTree  = TreeObj . Tree
 
-makeBlob :: ByteString -> Blob
-makeBlob = Blob
+makeBlob :: ByteString -> Object
+makeBlob = BlobObj . Blob
+
+makeTreeEntryType = TTree
+makeBlobEntryType = TBlob
 
 bytestr :: String -> PB.Parser ByteString
 bytestr s = string $ C.pack s
@@ -76,7 +80,7 @@ parseParent = do
   nls
   pure pid
 
-parseEntry :: PB.Parser (EntryType, ObjectId, Name)
+parseEntry :: PB.Parser (EntryType, ObjectId, ObjectName)
 parseEntry = do
   etype <- constP "blob " TBlob <|> constP "tree " TTree
   id    <- takeTill (== ' ')

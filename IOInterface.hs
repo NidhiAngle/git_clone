@@ -1,3 +1,8 @@
+module IOInterface (
+  writeObjectToFile,
+  readObjectFromFile
+) where
+
 import qualified Objects as O
 import System.Directory
 import qualified Codec.Compression.Zlib as Zlib
@@ -5,15 +10,15 @@ import qualified Data.ByteString.Lazy as B
 import qualified ObjectStore as OS
 import Data.ByteString.Char8 as C
 
-writeObjectToFile :: OS.Repo -> O.Object -> IO ()
+writeObjectToFile :: OS.Repo -> O.Object -> IO O.ObjectId
 writeObjectToFile r o = do
     let (pathIO, nameIO, contentIO) = OS.exportObject r o
     path <- pathIO
-    name <- nameIO
+    nameBytes <- nameIO
     content <- compress contentIO
     createDirectoryIfMissing True path  
-    B.writeFile name content
-    return () 
+    B.writeFile (OS.getObjPath r nameBytes) content
+    return nameBytes 
     where
         compress :: IO C.ByteString -> IO B.ByteString
         compress mxs = do mx <- mxs
@@ -35,9 +40,11 @@ readObjectFromFile r id = do
   else return Nothing
   where inflate blob = C.concat . B.toChunks . Zlib.decompress $ B.fromChunks [blob] 
 
-testRead :: OS.Repo -> FilePath -> IO ()
-testRead r f = do
-  maybeObj <- readObjectFromFile r (C.pack f)
-  case maybeObj of
-    Just obj -> Prelude.putStrLn $ C.unpack (OS.objToByte obj) 
-    Nothing -> Prelude.putStrLn "Found nothing"
+-- testRead :: OS.Repo -> FilePath -> IO ()
+-- testRead r f = do
+--   maybeObj <- readObjectFromFile r (C.pack f)
+--   case maybeObj of 
+--     Just obj -> case obj of
+--       (O.BlobObj blob) -> Prelude.putStrLn $ C.unpack (O.content blob)
+--       _ -> Prelude.putStrLn "Found a different object type than blob"
+--     Nothing -> Prelude.putStrLn "Found nothing"
