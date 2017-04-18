@@ -73,7 +73,7 @@ parseParent :: PB.Parser C.ByteString
 parseParent = do
   pid <- bytestr "parent " *> takeTill (== '\n')
   nls
-  pure $ pid
+  pure pid
 
 parseEntry :: PB.Parser (EntryType, ObjectId, Name)
 parseEntry = do
@@ -82,7 +82,7 @@ parseEntry = do
   nls
   name  <- takeTill (== '\n') 
   nls
-  pure $ (etype, id, name)
+  pure (etype, id, name)
 
 parseCommit :: PB.Parser Commit 
 parseCommit = do
@@ -118,7 +118,6 @@ toLineCommit c = (Prelude.foldl (\b x -> b `C.append` (helper "parent " x)) (C.p
   where
     helper "msg" x = (C.pack "\n") `C.append` x `C.append` (C.pack "\n")
     helper str x   = (C.pack str) `C.append` x `C.append` (C.pack "\n")
-
 
 -- pretty printer for tree objects, for example, to write to files
 -- put in object?
