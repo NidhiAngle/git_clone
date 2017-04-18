@@ -51,7 +51,7 @@ data Blob = Blob{
 }
 
 makeCommit :: [ObjectId]-> ObjectId -> ByteString -> ByteString -> Commit
-makeCommit p t a m = Commit p t a m
+makeCommit = Commit
 
 makeTree :: [(String, ObjectId, Name)] -> Tree
 makeTree e = Tree $ Prelude.map change e
@@ -59,7 +59,7 @@ makeTree e = Tree $ Prelude.map change e
         change (_, i, n) = (TBlob, i, n)
 
 makeBlob :: ByteString -> Blob
-makeBlob b = Blob b
+makeBlob = Blob
 
 bytestr :: String -> PB.Parser ByteString
 bytestr s = string $ C.pack s
@@ -112,13 +112,14 @@ parseBlob = do
 
 -- pretty printer for commit objects, for example, to write to files
 toLineCommit :: Commit -> C.ByteString
-toLineCommit c = (Prelude.foldl (\b x -> b `C.append` (helper "parent " x)) (C.pack "") (parents c)) 
-                 `C.append` (helper "tree " (tree c)) 
-                 `C.append` (helper "author " (author c)) 
-                 `C.append` (helper "msg" (message c))
+toLineCommit c = Prelude.foldl (\b x -> b `C.append` helper "parent " x) 
+                 (C.pack "") (parents c) 
+                 `C.append` helper "tree " (tree c) 
+                 `C.append` helper "author " (author c)
+                 `C.append` helper "msg" (message c)
   where
-    helper "msg" x    = (C.pack "\n") `C.append` x `C.append` (C.pack "\n")
-    helper str x   = (C.pack str) `C.append` x `C.append` (C.pack "\n")
+    helper "msg" x    = C.pack "\n" `C.append` x `C.append` C.pack "\n"
+    helper str x   = C.pack str `C.append` x `C.append` C.pack "\n"
 
 -- pretty printer for tree objects, for example, to write to files
 -- put in object?
@@ -126,8 +127,10 @@ toLineTree :: Tree -> C.ByteString
 toLineTree t = Prelude.foldl helper (C.pack "") (entries t)
   where 
     helper base (x, id, name) = case x of
-      TBlob -> base `C.append` (C.pack "blob ") `C.append` id `C.append` (C.pack " ") `C.append` name `C.append` (C.pack "\n")
-      TTree -> base `C.append` (C.pack "tree ") `C.append` id `C.append` (C.pack " ") `C.append` name `C.append` (C.pack "\n")
+      TBlob -> base `C.append` C.pack "blob " `C.append` id `C.append` 
+               C.pack " " `C.append` name `C.append` C.pack "\n"
+      TTree -> base `C.append` C.pack "tree " `C.append` id `C.append` 
+               C.pack " " `C.append` name `C.append` C.pack "\n"
 
 -- pretty printer for commit objects, for example, to write to files
 toLineBlob :: Blob -> C.ByteString
