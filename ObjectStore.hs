@@ -62,9 +62,9 @@ parseHeader :: String -> Parser ByteString
 parseHeader str = O.bytestr str *> takeTill (=='\0')
 -- DONT FORGET TO ADD THIS
 parseObject :: Parser O.Object
-parseObject = fmap O.CommitObj O.parseCommit <|> 
-              fmap O.TreeObj O.parseTree <|> 
-              fmap O.BlobObj O.parseBlob
+parseObject = (parseHeader "commit") *> fmap O.CommitObj O.parseCommit <|> 
+              (parseHeader "tree") *> fmap O.TreeObj O.parseTree <|> 
+              (parseHeader "blob") *> fmap O.BlobObj O.parseBlob
 
 readObject :: ByteString -> Maybe O.Object
 readObject str = case parseOnly parseObject str of
