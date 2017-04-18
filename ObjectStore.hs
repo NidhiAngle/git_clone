@@ -3,6 +3,9 @@
 
 module ObjectStore(
   Repo
+ ,Ref
+ ,addRef
+ ,createRef
  ,getObjPath
  ,exportObject
  ,importObject
@@ -16,22 +19,23 @@ import System.FilePath
 import Control.Monad ()
 import Control.Applicative ((<|>))
 import Data.Attoparsec.ByteString.Char8 as PB
+import Data.Map as Map
 
-data Ref = Ref {
-  refName :: C.ByteString
- ,refId   :: O.ObjectId
-}
 
+type Ref  = Map C.ByteString O.ObjectId 
 type Repo = String
+type HEAD = String
 
-makeRef :: C.ByteString -> O.ObjectId -> Ref
-makeRef name id = Ref name id 
+addRef :: Ref -> C.ByteString -> O.ObjectId -> Ref
+addRef refs branch objId = Map.insert branch objId refs 
+
+createRef :: Ref
+createRef = Map.empty :: Ref 
 -- Given the name of the repository and id, this gives you the filepath
 getObjPath :: Repo -> O.ObjectId -> FilePath
 getObjPath r o = r </> ".git" </> "objects"  </> Prelude.take 2 (C.unpack o) </> Prelude.drop 2 (C.unpack o)
 
 hexSha256 :: ByteString -> ByteString
---hexSha256 b = C.pack "abcdefghijklmnopqrstuvwxyz12345678901234"
 hexSha256 bs = digestToHexByteString (hash bs :: Digest SHA256)
 
 -- Given object, adds header and hashes to give
@@ -77,8 +81,6 @@ readObject str = case parseOnly parseObject str of
 importObject :: Monad m => m ByteString -> m (Maybe O.Object)
 importObject = fmap readObject
  
-------------------------------------------------
-
 
 -------------------------------------------------------------------
 
