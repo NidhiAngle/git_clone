@@ -24,9 +24,9 @@ commit r head a m = do
 commitDirectories :: FilePath -> OS.Repo -> IO [(O.EntryType, O.ObjectId, O.ObjectName)]
 commitDirectories fp r = do 
     filePaths <- listDirectory fp
-    foldr (\dir acc -> commitEachDirectory r dir `mappend` acc ) (return []) filePaths where
-    commitEachDirectory r filepath = do
-        entry <- commitDirectory r filepath 
+    foldr (\dir acc -> commitEachDirectory dir r `mappend` acc ) (return []) filePaths where
+    commitEachDirectory filepath r = do
+        entry <- commitDirectory filepath r
         case entry of
              Just x -> return [x] 
              Nothing -> return []
