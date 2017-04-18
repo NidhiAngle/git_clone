@@ -1,7 +1,6 @@
 module Objects (
    Object(..)
   ,ObjectId
-  ,EntryType
   ,makeCommit
   ,makeTree-- COMMENT OUT LATER
   ,makeBlob-- COMMENT OUT LATER
