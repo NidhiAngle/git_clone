@@ -8,7 +8,7 @@ module ObjectStore(
  ,importObject
  ,readObject
   ) where
---import "cryptohash" Crypto.Hash
+import "cryptohash" Crypto.Hash
 import Data.ByteString.Char8 as C
 import qualified Objects as O
 import Text.Printf (printf)
@@ -23,11 +23,11 @@ type Repo = String
 
 -- Given the name of the repository and id, this gives you the filepath
 getObjPath :: Repo -> O.ObjectId -> FilePath
-getObjPath r o = (r </> ".git" </> "objects"  </> (Prelude.take 2 (C.unpack o)) </> (Prelude.drop 2 (C.unpack o)))
+getObjPath r o = r </> ".git" </> "objects"  </> Prelude.take 2 (C.unpack o) </> Prelude.drop 2 (C.unpack o)
 
 hexSha256 :: ByteString -> ByteString
-hexSha256 b = C.pack "abcdefghijklmnopqrstuvwxyz12345678901234"
---hexSha256 bs = digestToHexByteString ((hash bs) :: Digest SHA256)
+--hexSha256 b = C.pack "abcdefghijklmnopqrstuvwxyz12345678901234"
+hexSha256 bs = digestToHexByteString (hash bs :: Digest SHA256)
 
 -- Given object, adds header and hashes to give
 -- id and new content
@@ -39,12 +39,10 @@ hashContent obj = do
       id               = hexSha256 headerAndContent
   (id, headerAndContent) 
   where 
-      getHeader (O.CommitObj c) l = (C.pack "commit ") `C.append`
-                                    (C.pack (l++"\0"))
-      getHeader (O.TreeObj c) l   = (C.pack "tree ") `C.append`
-                                    (C.pack (l++"\0"))
-      getHeader (O.BlobObj c) l   = (C.pack "blob ") `C.append`
-                                    (C.pack (l++"\0"))
+      getHeader (O.CommitObj _) l = createHeader "commit" l 
+      getHeader (O.TreeObj _) l   = createHeader "tree" l
+      getHeader (O.BlobObj _) l   = createHeader "blob" l 
+      createHeader objectType l = C.pack (objectType ++ " ") `C.append` C.pack (l ++ "\0")
 
 -- Consolidates a object type to a bytestring
 objToByte :: O.Object -> C.ByteString
@@ -62,9 +60,9 @@ parseHeader :: String -> Parser ByteString
 parseHeader str = O.bytestr str *> takeTill (=='\0')
 -- DONT FORGET TO ADD THIS
 parseObject :: Parser O.Object
-parseObject = (parseHeader "commit") *> fmap O.CommitObj O.parseCommit <|> 
-              (parseHeader "tree") *> fmap O.TreeObj O.parseTree <|> 
-              (parseHeader "blob") *> fmap O.BlobObj O.parseBlob
+parseObject = parseHeader "commit" *> fmap O.CommitObj O.parseCommit <|> 
+              parseHeader "tree" *> fmap O.TreeObj O.parseTree <|> 
+              parseHeader "blob" *> fmap O.BlobObj O.parseBlob
 
 readObject :: ByteString -> Maybe O.Object
 readObject str = case parseOnly parseObject str of
