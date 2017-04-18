@@ -34,3 +34,10 @@ readObjectFromFile r id = do
     return $ OS.readObject $ inflate bs
   else return Nothing
   where inflate blob = C.concat . B.toChunks . Zlib.decompress $ B.fromChunks [blob] 
+
+testRead :: OS.Repo -> FilePath -> IO ()
+testRead r f = do
+  maybeObj <- readObjectFromFile r (C.pack f)
+  case maybeObj of
+    Just obj -> Prelude.putStrLn $ C.unpack (OS.objToByte obj) 
+    Nothing -> Prelude.putStrLn "Found nothing"
