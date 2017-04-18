@@ -48,13 +48,13 @@ data Blob = Blob{
  content :: C.ByteString
 }
 
-makeCommit p t a m = Commit p t a m
+makeCommit = Commit
 
 makeTree e = Tree $ Prelude.map change e
   where change ("tree", i, n) = (TTree, i, n)
         change (_, i, n) = (TBlob, i, n)
 
-makeBlob b = Blob b
+makeBlob = Blob
 
 
 bytestr :: String -> PB.Parser ByteString
@@ -71,7 +71,7 @@ parseParent :: PB.Parser C.ByteString
 parseParent = do
   pid <- bytestr "parent " *> takeTill (== '\n')
   nls
-  pure $ pid
+  pure pid
 
 parseEntry :: PB.Parser (EntryType, ObjectId, Name)
 parseEntry = do
@@ -80,7 +80,7 @@ parseEntry = do
   nls
   name  <- takeTill (== '\n') 
   nls
-  pure $ (etype, id, name)
+  pure (etype, id, name)
 
 parseCommit :: PB.Parser Commit 
 parseCommit = do
@@ -109,21 +109,21 @@ parseBlob = do
 
 -- pretty printer for commit objects, for example, to write to files
 toLineCommit :: String -> Commit -> C.ByteString
-toLineCommit "tree" c   = (C.pack "tree ") `C.append` (tree c) `C.append` (C.pack "\n") -- takeTill solved what about this
-toLineCommit "author" c = (C.pack "author ") `C.append` (author c) `C.append` (C.pack "\n")
-toLineCommit "msg" c    = (C.pack "\n") `C.append` (message c) `C.append` (C.pack "\n")
+toLineCommit "tree" c   = C.pack "tree " `C.append` tree c `C.append` C.pack "\n" -- takeTill solved what about this
+toLineCommit "author" c = C.pack "author " `C.append` author c `C.append` C.pack "\n"
+toLineCommit "msg" c    = C.pack "\n" `C.append` message c `C.append` C.pack "\n"
 toLineCommit "parent" c = writeParents (parents c) where
-  writeParents []     = C.pack ""
-  writeParents (p:ps) = (C.pack "parent ") `C.append` p `C.append` (C.pack "\n") `C.append` (writeParents ps)
-toLineCommit _ c        = (C.pack "Unexpected property\n")
+  writeParents = foldr (\ p -> C.append (C.pack "parent " `C.append` p `C.append` C.pack "\n")) C.empty 
+toLineCommit _ c        = C.pack "Unexpected property\n"
 
 -- pretty printer for tree objects, for example, to write to files
 -- put in object?
 toLineTree :: Tree -> C.ByteString 
 toLineTree t = writeEntries (entries t) where
-  writeEntries []                     = C.pack ""
-  writeEntries ((TBlob, id , name):es) = (C.pack "blob ") `C.append` id `C.append` name `C.append` (C.pack "\n")
-  writeEntries ((TTree, id, name):es) = (C.pack "tree ") `C.append` id `C.append` name `C.append` (C.pack "\n")
+  writeEntries []                     = C.empty
+  writeEntries ((TBlob, id , name):es) = writeLine "blob" id name `C.append` writeEntries es
+  writeEntries ((TTree, id, name):es) = writeLine "tree" id name `C.append` writeEntries es 
+  writeLine objectType id name = C.pack (objectType ++ " ") `C.append` id `C.append` name `C.append` C.pack "\n"
 
 -- pretty printer for commit objects, for example, to write to files
 -- put in object?
