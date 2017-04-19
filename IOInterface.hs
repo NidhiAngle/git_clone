@@ -116,6 +116,7 @@ initialize r ref = do
     Prelude.writeFile (r ++ "/.git/refs/HEAD") "refs: refs/heads/master"
     return ref
 
+-- First one else where??
 setHead :: OS.Repo -> OS.Branch -> OS.Ref -> IO ()
 setHead r b ref = do
   C.writeFile (r ++ "/.hit/refs/heads/" ++ b) ref 

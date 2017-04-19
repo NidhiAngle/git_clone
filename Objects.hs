@@ -35,22 +35,6 @@ instance Show EntryType where
 
 data Object = CommitObj Commit | TreeObj Tree | BlobObj Blob deriving (Eq, Show)
 
--- YOU CAN JUST DERIVE SHOW 
--- instance Show Object where
---   show (CommitObj c) = show c
---   show (TreeObj t) = show t
---   show (BlobObj b) = show b
-
--- instance Show Commit where
---   show commit = show (((fmap C.unpack) . parents) commit) ++ show ((C.unpack . tree) commit) ++ show (author commit) ++ show (message commit)
-
--- instance Show Tree where
---   show tree = show $ Prelude.foldr (\(_,x,_) acc -> acc `C.append` x) C.empty (entries tree)
-
--- instance Show Blob where
---   show blob = "blob"
---hashObject (CommitObj c) = hashCommit c
-
 data Commit = Commit {
   parents  :: [ObjectId]
  ,tree     :: ObjectId
@@ -111,7 +95,7 @@ parseCommit = do
   author  <- bytestr "author " *> takeTill (== '\n')
   nls
   nls
-  msg     <- bytestr "msg " *> takeTill (== '\n')
+  msg     <- takeTill (== '\n')
   nls
   pure $ Commit parents tree author msg
 
