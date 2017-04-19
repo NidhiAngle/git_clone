@@ -30,7 +30,6 @@ writeObject r o = do
     let (path, name, content) = OS.exportObject r o
     fmap show content 
  -- Why cant I use (putStr . show) even after changing to IO ()
-commit = O.makeCommit [C.pack "PARENT ID"] (C.pack "TREE ID") (C.pack "AUTHOR") (C.pack "MSG")
 
 readObjectFromFile :: OS.Repo -> O.ObjectId -> IO (Maybe O.Object)
 readObjectFromFile r id = do 

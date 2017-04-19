@@ -35,6 +35,19 @@ instance Show EntryType where
 
 data Object = CommitObj Commit | TreeObj Tree | BlobObj Blob deriving (Eq, Show)
 
+instance Show Object where
+  show (CommitObj c) = show c
+  show (TreeObj t) = show t
+  show (BlobObj b) = show b
+
+instance Show Commit where
+  show commit = show ((C.unpack . tree) commit) ++ show (author commit) ++ show (message commit)
+
+instance Show Tree where
+  show tree = show $ Prelude.foldr (\(_,x,_) acc -> acc `C.append` x) C.empty (entries tree)
+
+instance Show Blob where
+  show blob = "blob"
 --hashObject (CommitObj c) = hashCommit c
 
 data Commit = Commit {
