@@ -1,3 +1,8 @@
+module IOInterface (
+  writeObjectToFile,
+  readObjectFromFile
+) where
+
 import qualified Objects as O
 import System.Directory
 import qualified Codec.Compression.Zlib as Zlib
@@ -6,15 +11,15 @@ import qualified ObjectStore as OS
 import Data.ByteString.Char8 as C
 import Control.Monad 
 
-writeObjectToFile :: OS.Repo -> O.Object -> IO (String)
+writeObjectToFile :: OS.Repo -> O.Object -> IO O.ObjectId
 writeObjectToFile r o = do
     let (pathIO, nameIO, contentIO) = OS.exportObject r o
     path <- pathIO
-    name <- nameIO
+    nameBytes <- nameIO
     content <- compress contentIO
     createDirectoryIfMissing True path  
-    B.writeFile name content
-    return name 
+    B.writeFile (OS.getObjPath r nameBytes) content
+    return nameBytes 
     where
         compress :: IO C.ByteString -> IO B.ByteString
         compress mxs = do mx <- mxs

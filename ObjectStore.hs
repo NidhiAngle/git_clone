@@ -59,11 +59,11 @@ objToByte (O.CommitObj c) = O.toLineCommit c
 objToByte (O.TreeObj t)   = O.toLineTree t
 objToByte (O.BlobObj b)   = O.toLineBlob b
 
-exportObject :: Monad m => Repo -> O.Object -> (m FilePath,m FilePath, m C.ByteString)
+exportObject :: Monad m => Repo -> O.Object -> (m FilePath,m O.ObjectId, m C.ByteString)
 exportObject r obj= do
   let (id, content) = hashContent obj
       path  = getObjPath r id
-  (return (takeDirectory path), return path, return content)
+  (return (takeDirectory path), return id, return content)
 
 parseHeader :: String -> Parser ByteString
 parseHeader str = O.bytestr str *> takeTill (=='\0')
