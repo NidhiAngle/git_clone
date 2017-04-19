@@ -29,7 +29,7 @@ instance Show EntryType where
   show TTree   = "tree"
   show TBlob   = "blob"
 
-data Object = CommitObj Commit | TreeObj Tree | BlobObj Blob
+data Object = CommitObj Commit | TreeObj Tree | BlobObj Blob deriving (Eq, Show)
 
 --hashObject (CommitObj c) = hashCommit c
 
@@ -38,16 +38,16 @@ data Commit = Commit {
  ,tree     :: ObjectId
  ,author   :: C.ByteString
  ,message  :: C.ByteString
-}
+} deriving (Eq, Show)
 
 data Tree = Tree{
  entries  :: [(EntryType, ObjectId, Name)] -- same object id but different file names?
                                                  -- to prevent commit in tree
-}
+} deriving (Eq, Show)
 
 data Blob = Blob{
  content :: C.ByteString
-}
+} deriving (Eq, Show)
 
 makeCommit :: [ObjectId]-> ObjectId -> ByteString -> ByteString -> Commit
 makeCommit = Commit
@@ -92,7 +92,7 @@ parseCommit = do
   author  <- bytestr "author " *> takeTill (== '\n')
   nls
   nls
-  msg     <- takeTill (== '\n')
+  msg     <- bytestr "msg " *> takeTill (== '\n')
   nls
   pure $ Commit parents tree author msg
 
