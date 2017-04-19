@@ -33,7 +33,7 @@ createRef :: Ref
 createRef = Map.empty :: Ref 
 -- Given the name of the repository and id, this gives you the filepath
 getObjPath :: Repo -> O.ObjectId -> FilePath
-getObjPath r o = r </> ".git" </> "objects"  </> Prelude.take 2 (C.unpack o) </> Prelude.drop 2 (C.unpack o)
+getObjPath r o = r </> ".hit" </> "objects"  </> Prelude.take 2 (C.unpack o) </> Prelude.drop 2 (C.unpack o)
 
 hexSha256 :: ByteString -> ByteString
 hexSha256 bs = digestToHexByteString (hash bs :: Digest SHA256)
@@ -59,11 +59,11 @@ objToByte (O.CommitObj c) = O.toLineCommit c
 objToByte (O.TreeObj t)   = O.toLineTree t
 objToByte (O.BlobObj b)   = O.toLineBlob b
 
-exportObject :: Monad m => Repo -> O.Object -> (m FilePath,m FilePath, m C.ByteString)
+exportObject :: Monad m => Repo -> O.Object -> (m FilePath,m O.ObjectId, m C.ByteString)
 exportObject r obj= do
   let (id, content) = hashContent obj
       path  = getObjPath r id
-  (return (takeDirectory path), return path, return content)
+  (return (takeDirectory path), return id, return content)
 
 parseHeader :: String -> Parser ByteString
 parseHeader str = O.bytestr str *> takeTill (=='\0') *> string (C.pack "\0")
