@@ -66,7 +66,7 @@ exportObject r obj= do
   (return (takeDirectory path), return id, return content)
 
 parseHeader :: String -> Parser ByteString
-parseHeader str = O.bytestr str *> takeTill (=='\0')
+parseHeader str = O.bytestr str *> takeTill (=='\0') <* char '\0'
 
 parseObject :: Parser O.Object
 parseObject = parseHeader "commit" *> fmap O.CommitObj O.parseCommit <|> 
