@@ -3,8 +3,12 @@
 
 module ObjectStore(
   Repo
+ ,Branch
  ,Ref
+ ,RefStore
+ ,getRefs
  ,addRef
+ ,lookupRef
  ,createRef
  ,getObjPath
  ,exportObject
@@ -22,15 +26,23 @@ import Data.Attoparsec.ByteString.Char8 as PB
 import Data.Map as Map
 
 
-type Ref  = Map C.ByteString O.ObjectId 
+type RefStore  = Map C.ByteString O.ObjectId
+type Ref = O.ObjectId 
 type Repo = String
 type HEAD = String
+type Branch = String
 
-addRef :: Ref -> C.ByteString -> O.ObjectId -> Ref
+addRef :: RefStore -> C.ByteString -> Ref -> RefStore
 addRef refs branch objId = Map.insert branch objId refs 
 
-createRef :: Ref
-createRef = Map.empty :: Ref 
+getRefs :: RefStore -> [(C.ByteString, O.ObjectId)]
+getRefs = Map.toList
+
+lookupRef :: C.ByteString -> RefStore -> Maybe Ref
+lookupRef = Map.lookup
+
+createRef :: RefStore
+createRef = Map.empty 
 -- Given the name of the repository and id, this gives you the filepath
 getObjPath :: Repo -> O.ObjectId -> FilePath
 getObjPath r o = r </> ".hit" </> "objects"  </> Prelude.take 2 (C.unpack o) </> Prelude.drop 2 (C.unpack o)
