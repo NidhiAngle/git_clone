@@ -9,7 +9,8 @@ import Objects as O
 import Data.ByteString.Char8 as C
 
 commit = makeCommit [(C.pack "PARENT1"), (C.pack "PARENT2")] (C.pack "TREE") (C.pack "AUTHOR") (C.pack "MSG")
-tree = makeTree [("blob", (C.pack "BLOB1"), (C.pack "first")), ("blob", (C.pack "BLOB2"), (C.pack "sec")),("tree", (C.pack "TREE"), (C.pack "third"))]
+tree = makeTree [(O.makeBlobEntryType, (C.pack "BLOB1"), (C.pack "first")), (O.makeBlobEntryType, (C.pack "BLOB2")
+                ,(C.pack "sec")),(O.makeTreeEntryType, (C.pack "TREE"), (C.pack "third"))]
 emptyTree = makeTree []
 emptyParentCommit = makeCommit [] (C.pack "TREE") (C.pack "AUTHOR") (C.pack "MSG")
 blob = makeBlob $ C.pack "Hi there everyone! Welcome to our git clone."
@@ -21,12 +22,12 @@ emptytreeStr = C.pack "tree xx\0"
 blobStr   = C.pack "blob xx\0Hi there everyone! Welcome to our git clone."
 
 -- exportObject :: Monad m => Repo -> O.Object -> (m FilePath,m FilePath, m C.ByteString)
---importObject :: Monad m => m ByteString -> m (Maybe O.Object)
 
 
 importObjectTests = TestList [
-  readObject commitStr ~?= Just (O.CommitObj commit),
-  readObject commitWOParentStr ~?= Just (O.CommitObj emptyParentCommit),
-  readObject treeStr ~?= Just (O.TreeObj tree),
-  readObject emptytreeStr ~?= Just (O.TreeObj emptyTree),
-  readObject blobStr ~?= Just (O.BlobObj blob)]
+  readObject commitStr ~?= Just commit,
+  readObject commitWOParentStr ~?= Just emptyParentCommit,
+  readObject treeStr ~?= Just tree,
+  readObject emptytreeStr ~?= Just emptyTree,
+  readObject blobStr ~?= Just blob]
+
