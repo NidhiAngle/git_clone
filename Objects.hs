@@ -41,7 +41,7 @@ instance Show Object where
   show (BlobObj b) = show b
 
 instance Show Commit where
-  show commit = show ((C.unpack . tree) commit) ++ show (author commit) ++ show (message commit)
+  show commit = show (((fmap C.unpack) . parents) commit) ++ show ((C.unpack . tree) commit) ++ show (author commit) ++ show (message commit)
 
 instance Show Tree where
   show tree = show $ Prelude.foldr (\(_,x,_) acc -> acc `C.append` x) C.empty (entries tree)
