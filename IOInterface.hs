@@ -51,7 +51,7 @@ testRead r f = do
 --ASSUMPTION NO REMOTES
 --readRefs OS.Repo
 readRefs repo ref = do
-  branches <- listDirectory (repo ++ "/.git/refs/heads")
+  branches <- listDirectory (repo ++ "/.hit/refs/heads")
   addRefs branches
   where
     addRefs []     = return ref
@@ -61,11 +61,11 @@ readRefs repo ref = do
 
 createEmptyRepo :: OS.Repo -> IO ()
 createEmptyRepo repo = Prelude.mapM_ (createDirectoryIfMissing True) folders
-    where folders = [repo ++ "/.git/objects", repo ++ "/.git/refs/heads"]
+    where folders = [repo ++ "/.hit/objects", repo ++ "/.hit/refs/heads"]
 
 initialize :: OS.Repo -> OS.Ref -> IO(OS.Ref)
 initialize r ref = do
-  dexists <- doesDirectoryExist (r ++ "/.git") 
+  dexists <- doesDirectoryExist (r ++ "/.hit") 
   if dexists then do
     Prelude.putStrLn "Reinitializing git directory"
     readRefs r ref
@@ -77,12 +77,12 @@ initialize r ref = do
 userInterface :: IO()
 userInterface = go OS.createRef where
   go refMap = do
-    Prelude.putStr "git> "
+    Prelude.putStr "hit> "
     str <- Prelude.getLine
     case str of
       "init" -> initialize "nidhiTest" refMap >>= go 
       "exit" -> do 
                  Prelude.putStrLn $ show refMap
                  return ()
-
+      _      -> Prelude.putStrLn "Unrecognized command" >> go refMap
 

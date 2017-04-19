@@ -33,7 +33,7 @@ createRef :: Ref
 createRef = Map.empty :: Ref 
 -- Given the name of the repository and id, this gives you the filepath
 getObjPath :: Repo -> O.ObjectId -> FilePath
-getObjPath r o = r </> ".git" </> "objects"  </> Prelude.take 2 (C.unpack o) </> Prelude.drop 2 (C.unpack o)
+getObjPath r o = r </> ".hit" </> "objects"  </> Prelude.take 2 (C.unpack o) </> Prelude.drop 2 (C.unpack o)
 
 hexSha256 :: ByteString -> ByteString
 hexSha256 bs = digestToHexByteString (hash bs :: Digest SHA256)
