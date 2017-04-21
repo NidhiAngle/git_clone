@@ -12,7 +12,6 @@ module ObjectStore(
  ,createRef
  ,getObjPath
  ,exportObject
- ,importObject
  ,readObject
   ) where
 import "cryptohash" Crypto.Hash
@@ -71,11 +70,11 @@ objToByte (O.CommitObj c) = O.toLineCommit c
 objToByte (O.TreeObj t)   = O.toLineTree t
 objToByte (O.BlobObj b)   = O.toLineBlob b
 
-exportObject :: Monad m => Repo -> O.Object -> (m FilePath,m O.ObjectId, m C.ByteString)
+exportObject :: Repo -> O.Object -> (FilePath, O.ObjectId, C.ByteString)
 exportObject r obj= do
   let (id, content) = hashContent obj
       path  = getObjPath r id
-  (return (takeDirectory path), return id, return content)
+  (takeDirectory path, id, content)
 
 parseHeader :: String -> Parser ByteString
 parseHeader str = O.bytestr str *> takeTill (=='\0') <* char '\0'
@@ -90,8 +89,6 @@ readObject str = case parseOnly parseObject str of
   Right obj -> Just obj
   _         -> Nothing
 
-importObject :: Monad m => ByteString -> m (Maybe O.Object)
-importObject x =  return (readObject x)
  
 
 -------------------------------------------------------------------

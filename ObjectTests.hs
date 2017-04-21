@@ -22,7 +22,7 @@ emptytreeStr = C.pack "tree 0\0"
 blobStr   = C.pack "blob 44\0Hi there everyone! Welcome to our git clone."
 
 -- exportObject :: Monad m => Repo -> O.Object -> (m FilePath,m FilePath, m C.ByteString)
-third :: (m FilePath,m O.ObjectId, m C.ByteString) -> m C.ByteString
+third :: (FilePath,O.ObjectId, C.ByteString) -> C.ByteString
 third (a,b,c) = c
 
 importObjectTests = TestList [
@@ -33,8 +33,8 @@ importObjectTests = TestList [
   readObject blobStr ~?= Just blob]
 
 exportObjectTests = TestList [
-  ((third (exportObject "t" commit)) :: Maybe C.ByteString) ~?= Just commitStr,
-  ((third (exportObject "t" emptyParentCommit)) :: Maybe C.ByteString) ~?= Just commitWOParentStr,
-  ((third (exportObject "t" tree)) :: Maybe C.ByteString) ~?= Just treeStr,
-  ((third (exportObject "t" emptyTree)) :: Maybe C.ByteString) ~?= Just emptytreeStr,
-  ((third (exportObject "t" blob)) :: Maybe C.ByteString) ~?= Just blobStr]
+  third (exportObject "t" commit) ~?= commitStr,
+  third (exportObject "t" emptyParentCommit) ~?= commitWOParentStr,
+  third (exportObject "t" tree) ~?= treeStr,
+  third (exportObject "t" emptyTree) ~?= emptytreeStr,
+  third (exportObject "t" blob) ~?= blobStr]
