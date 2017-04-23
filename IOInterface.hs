@@ -31,12 +31,13 @@ commitDirectories :: (RepoMonad m, Monad m, MonadIO m ) => FilePath -> OS.Repo -
 commitDirectories fp r = do 
     filePaths <- liftIO $ listDirectory fp
     foldr commit' (return []) filePaths where
-    commit' dir acc = commitEachDirectory dir r `mappend` acc
+    commit' dir acc = commitEachDirectory dir r `repomappend` acc
     commitEachDirectory filepath r = do
         entry <- commitDirectory filepath r
         case entry of
-          Just x  -> return [entry]
+          Just x  -> return [x]
           Nothing -> return []
+
 
 commitDirectory :: (RepoMonad m, Monad m, MonadIO m ) => FilePath -> OS.Repo -> 
                    m (Maybe (O.EntryType, O.ObjectId, O.ObjectName))
@@ -91,9 +92,9 @@ userInterface = go (OS.createRef) where
                   commitId <- commit "./" [head] (C.pack "Brendon") 
                               (C.pack "default msg")
                   setHead "./" "master" commitId
-                  liftIO $ putStrLn ("Commit ID: " ++ C.unpack commitId) >> go refMap'
+                  (liftIO ( putStrLn ("Commit ID: " ++ C.unpack commitId))) >> go refMap'
       "exit" -> do 
                  --print refMap
                  return ()
-      _      -> liftIO $ Prelude.putStrLn "Unrecognized command" >> go refMap
+      _      -> (liftIO (Prelude.putStrLn "Unrecognized command")) >> go refMap
 

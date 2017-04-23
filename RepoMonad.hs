@@ -10,6 +10,7 @@ import qualified ObjectStore as OS
 import qualified Data.ByteString.Char8 as C
 import Control.Monad 
 import Control.Monad.Except
+import Data.Monoid
 import System.Directory (createDirectoryIfMissing, listDirectory,
                          doesDirectoryExist,doesFileExist)
 import System.FilePath (splitFileName)
@@ -23,6 +24,7 @@ class RepoMonad m where
    getHeadRef :: OS.Repo -> m OS.Ref
    setHead :: OS.Repo -> OS.Branch -> OS.Ref -> m ()
    readRefs :: OS.Repo -> OS.RefStore -> m OS.RefStore
+   repomappend :: (Monoid a) => m a -> m a -> m a
 
 instance RepoMonad (ExceptT String IO) where
 
@@ -87,4 +89,12 @@ instance RepoMonad (ExceptT String IO) where
         addRefs (b:bs) = do
                            id <- liftIO $ C.readFile (repo ++ "/.hit/refs/heads/" ++ b)
                            return $ OS.addRef ref (C.pack b) id
-    
+  
+  repomappend x y = mappend <$> x <*> y 
+
+-- instance (Monoid a) => Monoid (RepoMonad a)  where  
+--     mempty = return mempty  
+--     mappend = mappend
+
+-- instance Monoid m => Monoid (ExceptT e m) where
+--   mempty = mempty
