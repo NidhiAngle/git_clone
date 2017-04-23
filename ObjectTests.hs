@@ -8,14 +8,33 @@ import ObjectStore as OS
 import Objects as O
 import Data.ByteString.Char8 as C
 
-commit = makeCommit [C.pack "PARENT ID"] (C.pack "TREE ID") (C.pack "AUTHOR") (C.pack "MSG")
-tree = makeTree [("blob", (C.pack "BLOB1 ID"), (C.pack "First one")), ("blob", (C.pack "BLOB2 ID"), (C.pack "Second one")),("tree", (C.pack "Tree ID"), (C.pack "Second one"))]
+commit = makeCommit [(C.pack "PARENT1"), (C.pack "PARENT2")] (C.pack "TREE") (C.pack "AUTHOR") (C.pack "MSG")
+tree = makeTree [(O.makeBlobEntryType, (C.pack "BLOB1"), (C.pack "first")), (O.makeBlobEntryType, (C.pack "BLOB2")
+                ,(C.pack "sec")),(O.makeTreeEntryType, (C.pack "TREE"), (C.pack "third"))]
 emptyTree = makeTree []
-emptyParentCommit = makeCommit [] (C.pack "TREE ID") (C.pack "AUTHOR") (C.pack "MSG")
+emptyParentCommit = makeCommit [] (C.pack "TREE") (C.pack "AUTHOR") (C.pack "MSG")
 blob = makeBlob $ C.pack "Hi there everyone! Welcome to our git clone."
 
-commitStr= C.pack "parent PARENT1\nparent PARENT2\ntree TREE\nauthor AUTHOR\n\nmsg MSG\n"
-commitWOParentStr = C.pack "tree TREE\nauthor AUTHOR\n\nmsg MS\n"
-treeStr = C.pack "blob BLOB1 first\nblob BLOB2 sec\ntree TREE third\n"
-emptytreeStr = C.pack ""
-blobStr = C.pack "Hi there everyone! Welcome to our git clone."
+commitStr = C.pack "commit 59\0parent PARENT1\nparent PARENT2\ntree TREE\nauthor AUTHOR\n\nMSG\n"
+commitWOParentStr = C.pack "commit 29\0tree TREE\nauthor AUTHOR\n\nMSG\n"
+treeStr   = C.pack "tree 48\0blob BLOB1 first\nblob BLOB2 sec\ntree TREE third\n"
+emptytreeStr = C.pack "tree 0\0"
+blobStr   = C.pack "blob 44\0Hi there everyone! Welcome to our git clone."
+
+-- exportObject :: Monad m => Repo -> O.Object -> (m FilePath,m FilePath, m C.ByteString)
+third :: (FilePath,O.ObjectId, C.ByteString) -> C.ByteString
+third (a,b,c) = c
+
+importObjectTests = TestList [
+  readObject commitStr ~?= Just commit,
+  readObject commitWOParentStr ~?= Just emptyParentCommit,
+  readObject treeStr ~?= Just tree,
+  readObject emptytreeStr ~?= Just emptyTree,
+  readObject blobStr ~?= Just blob]
+
+exportObjectTests = TestList [
+  third (exportObject "t" commit) ~?= commitStr,
+  third (exportObject "t" emptyParentCommit) ~?= commitWOParentStr,
+  third (exportObject "t" tree) ~?= treeStr,
+  third (exportObject "t" emptyTree) ~?= emptytreeStr,
+  third (exportObject "t" blob) ~?= blobStr]
