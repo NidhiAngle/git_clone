@@ -5,6 +5,7 @@ module GitRevisions (revParseTree, Relation(..), CaretQualifier(..), RevArg(..)
 
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Control.Monad (liftM2)
 
 data CaretQualifier = Head | Exclamation | Dash Word
 
@@ -33,75 +34,83 @@ data RevArg a  = RevId a |
 
 -- | Returns all the ancestors of Rev x along with x
 -- | !!! Make sure to not add parents multiple times
-getAllAncestors :: (Ord a, Show a) => a -> (a -> Set a) -> Set a -> Set a
-getAllAncestors x f s =
+getAllAncestors :: (Ord a, Show a, Monad m) => a -> (a -> m (Set a)) -> m (Set a) -> m (Set a)
+getAllAncestors x f ms = do
+  s <- ms
   if Set.member x s
-  then s
+  then ms
   else do
-      let newSet = Set.insert x s
-      case Set.toList $ f x of
-         [] -> newSet
-         -- Change to Set.unions
-         xs -> foldr (\y acc -> getAllAncestors y f acc `Set.union` acc) 
-                      newSet xs 
+      let newSet = return $ Set.insert x s
+      parents <-  f x
+      let ancestors = case Set.toList parents of
+                        [] -> newSet
+                        -- Change to Set.unions
+                        xs -> foldr (\y acc -> liftM2 Set.union (getAllAncestors y f acc) acc ) 
+                                     newSet xs 
+      ancestors
 {- 
  - Takes a list of Rev arguments and returns the matching set of Revs
  -}
-revParseTree :: (Ord a, Show a) => [RevArg a ] -> (a -> Set a) -> Set a
-revParseTree [] _  = Set.empty
+revParseTree :: (Ord a, Show a, Monad m) => [RevArg a ] -> (a -> m (Set a)) -> m (Set a)
+revParseTree [] _  = return Set.empty
 
-revParseTree (RevId x:xs) f = getAllAncestors x f Set.empty 
-                                       `Set.union` 
-                                       revParseTree xs f
+revParseTree (RevId x:xs) f = do 
+  ancestors <- getAllAncestors x f (return Set.empty)
+  others <- revParseTree xs f
+  return $ ancestors `Set.union` others 
 
 revParseTree (XOR (Exclude rev1) rev2:xs) f = 
   revParseTree (Exclude rev1 : rev2 : xs) f
 
-revParseTree (Exclude x:xs) f = revParseTree xs f 
-                                `Set.difference`
-                                case Set.toList (revParseTree [x] f) of
-                                  [] -> Set.empty
-                                  y:_ -> getAllAncestors y f Set.empty 
+revParseTree (Exclude x:xs) f = 
+  liftM2 Set.difference (revParseTree xs f) (excludeList x f) where
+  excludeList x f = do
+    ancestors <- revParseTree [x] f
+    case Set.toList ancestors of
+                      [] -> return Set.empty
+                      y:_ -> getAllAncestors y f (return Set.empty)
 
-revParseTree (XOR rev1 rev2:xs) f =
-  let set1 = revParseTree [rev1] f 
-      set2 = revParseTree [rev2] f 
-  in (set1 `Set.union` set2) 
-     `Set.difference` 
-     (set1 `Set.intersection` set2) 
-     `Set.union` 
-     revParseTree xs f 
+revParseTree (XOR rev1 rev2:xs) f = do
+  let set1 =  revParseTree [rev1] f 
+      set2 = revParseTree [rev2] f
+      remaining = revParseTree xs f 
+      difference = liftM2 Set.difference (liftM2 Set.union set1 set2) 
+                          (liftM2 Set.intersection set1 set2) 
+  liftM2 Set.union difference (revParseTree xs f) 
 
 revParseTree (Caret x Head:xs) f = 
-  getAllAncestors x f Set.empty 
-  `Set.difference` 
-  Set.singleton x 
-  `Set.union` 
-  revParseTree xs f 
+  liftM2 Set.union (liftM2 Set.difference (getAllAncestors x f (return Set.empty)) 
+                                          (return $ Set.singleton x)) 
+                   (revParseTree xs f)
 
-revParseTree (Caret x Exclamation:xs) f = 
+revParseTree (Caret x Exclamation:xs) f = do
+  parents <- f x 
   let ys = foldl (\acc y -> Exclude (RevId y) : acc) 
-            [RevId x] (Set.toList (f x))
-  in revParseTree (ys ++ xs) f 
+            [RevId x] (Set.toList parents)
+  revParseTree (ys ++ xs) f 
 
 revParseTree (Caret x (Dash idx):xs) f = 
   revParseTree (XOR (Exclude (Ancestry x [Parent idx])) (RevId x) : xs) f 
 
-revParseTree (Ancestry x as:xs) f = 
-  case traverseFamily x as f of
-    Nothing -> Set.empty
-    Just y -> Set.insert y (revParseTree xs f)
+revParseTree (Ancestry x as:xs) f = do 
+  familyMember <- traverseFamily x as f
+  let result = case Set.toList familyMember of
+                  [] -> return Set.empty
+                  y:_ -> liftM2 Set.union (return familyMember) (revParseTree xs f)
+  result
 
-traverseFamily :: (Ord a, Show a) => 
-                  a -> [Relation Word] -> (a -> Set a) -> Maybe a
-traverseFamily x [] _ = Just x 
+traverseFamily :: (Ord a, Show a, Monad m) => 
+                  a -> [Relation Word] -> (a -> m (Set a)) -> m (Set a)
+traverseFamily x [] _ = return $ Set.singleton x 
 traverseFamily x (Ancestor i:as) f =
   if i <= 0
   then traverseFamily x as f
-  else 
-    case Set.toList (f x) of
-      [] -> Nothing
+  else do
+    parents <- f x
+    case Set.toList parents of
+      [] -> return Set.empty
       p:ps -> traverseFamily p (Ancestor (i-1):as) f
-traverseFamily x (Parent i:as) f =
-  traverseFamily ((x : Set.toList (f x)) !! fromIntegral i) as f
+traverseFamily x (Parent i:as) f = do
+  parents <- f x
+  traverseFamily ((x : Set.toList parents) !! fromIntegral i) as f
 
