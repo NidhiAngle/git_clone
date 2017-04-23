@@ -8,6 +8,13 @@ import qualified Codec.Compression.Zlib as Zlib
 import qualified Data.ByteString.Lazy as B
 import qualified ObjectStore as OS
 import qualified Data.ByteString.Char8 as C
+import qualified GitRevisions as GR
+import qualified RepoMonad as RM
+import Data.List (sortOn)
+import Data.Set (Set)
+import qualified Data.Set as Set
+import qualified Data.Time.Clock as DT
+import qualified Data.Time.Format as DTF
 import Control.Monad 
 import System.Directory (createDirectoryIfMissing, listDirectory,
                          doesDirectoryExist,doesFileExist)
@@ -16,16 +23,18 @@ import System.FilePath (splitFileName)
 type Author = C.ByteString
 type Message = C.ByteString
 
-commit :: OS.Repo -> [OS.Ref] -> Author -> Message -> IO O.ObjectId
+commit :: (Monad m) => OS.Repo -> [OS.Ref] -> Author -> Message -> m O.ObjectId
 commit r refs a m = do
   objectIds <- commitDirectories r r
   let tree = O.makeTree objectIds
-  filename <- writeObjectToFile r tree
-  let c = O.makeCommit refs filename a m
-  writeObjectToFile r c
+  filename <- RM.writeObjectToFile r tree
+  currentTime <- DT.getCurrentTime
+  let cts = DTF.formatTime DTF.defaultTimeLocale "%s" currentTime
+  let c = O.makeCommit refs filename a m currentTime
+  RM.writeObjectToFile r c
 
-commitDirectories :: FilePath -> OS.Repo -> 
-                     IO [(O.EntryType, O.ObjectId, O.ObjectName)]
+commitDirectories :: (Monad m) => FilePath -> OS.Repo -> 
+                     m [(O.EntryType, O.ObjectId, O.ObjectName)]
 commitDirectories fp r = do 
     filePaths <- listDirectory fp
     foldr commit' (return []) filePaths where
@@ -46,12 +55,12 @@ commitDirectory filePath r =
     (True, _) -> do 
         objectIds <- commitDirectories filePath r
         let tree = O.makeTree objectIds
-        filename <- writeObjectToFile r tree
+        filename <- RM.writeObjectToFile r tree
         return $ Just (O.makeTreeEntryType, filename, C.pack filePath)
     (_, True) -> do
          contents <- C.readFile filePath
          let blob = O.makeBlob contents
-         fileName <- writeObjectToFile r blob
+         fileName <- RM.writeObjectToFile r blob
          return $ Just (O.makeBlobEntryType, fileName, C.pack filePath)
     (_,_)  ->  return Nothing 
 
@@ -134,6 +143,17 @@ getHeadRef r = do
   else return Nothing
   else return Nothing
 
+getLog :: OS.Repo -> OS.Ref -> IO ()
+getLog repo headRef = do
+  commitsSet <- GR.revParseTree [GR.RevId headRef] getCommitParent 
+  putStrLn "Blah" where
+    getCommitParent :: O.ObjectId -> m (Set O.ObjectId)
+    getCommitParent x = do
+      commitObj <- RM.readObjectFromFile repo x
+      case commitObj of 
+        O.CommitObj c -> return $ Set.unions $ fmap Set.singleton (O.parents c)
+        _ -> return Set.empty
+ 
 userInterface :: IO()
 userInterface = go OS.createRef where
   go refMap = do
