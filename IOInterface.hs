@@ -55,35 +55,6 @@ commitDirectory filePath r =
          return $ Just (O.makeBlobEntryType, fileName, C.pack filePath)
     (_,_)  ->  return Nothing 
 
-writeObjectToFile :: OS.Repo -> O.Object -> IO O.ObjectId
-writeObjectToFile r o = do
-    let (path, name, content) = OS.exportObject r o
-    createDirectoryIfMissing True path  
-    B.writeFile (OS.getObjPath r name) (compress content)
-    return name
-    where
-        compress :: C.ByteString -> B.ByteString
-        compress mx = (Zlib.compress . B.fromChunks) [mx]
-
-writeObject :: OS.Repo -> O.Object -> IO ()
-writeObject r o = do
-    let (path, name, content) = OS.exportObject r o
-    putStr $ C.unpack content 
- -- Why cant I use (putStr . show) even after changing to IO ()
-
-readObjectFromFile :: OS.Repo -> O.ObjectId -> IO (Maybe O.Object)
-readObjectFromFile r id = do 
-  let filename = OS.getObjPath r id 
-  exists <- doesFileExist filename
-  if exists then do
-    bs <- C.readFile filename
-    return $ OS.readObject $ inflate bs
-  else return Nothing
-  where inflate blob = C.concat . 
-                       B.toChunks . 
-                       Zlib.decompress $ 
-                       B.fromChunks [blob] 
-
 
 --ASSUMPTION NO REMOTES
 --readRefs OS.Repo
