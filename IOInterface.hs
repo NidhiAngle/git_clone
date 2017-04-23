@@ -25,15 +25,14 @@ type Author = C.ByteString
 type Message = C.ByteString
 
 
-commit ::  (RepoMonad m, Monad m, MonadIO m ) => 
+commit ::  (RepoMonad m, Monad m, MonadIO m) => 
            OS.Repo -> [OS.Ref] -> Author -> Message -> m O.ObjectId
 commit r refs a m = do
   objectIds <- commitDirectories r r
   let tree = O.makeTree objectIds
   filename <- RM.writeObjectToFile r tree
-  currentTime <- DT.getCurrentTime
-  let cts = DTF.formatTime DTF.defaultTimeLocale "%s" currentTime
-  let c = O.makeCommit refs filename a m currentTime
+  utc <- liftIO DT.getCurrentTime
+  let c = O.makeCommit refs filename a m utc
   RM.writeObjectToFile r c
 
 
@@ -92,15 +91,18 @@ initialize r ref = do
 
 getLog :: OS.Repo -> OS.Ref -> IO ()
 getLog repo headRef = do
-  commitsSet <- GR.revParseTree [GR.RevId headRef] getCommitParent 
-  putStrLn "Blah" where
-    getCommitParent :: O.ObjectId -> m (Set O.ObjectId)
-    getCommitParent x = do
+  set <- runExceptT $ GR.revParseTree [GR.RevId headRef] (getCommitParent repo)
+  case set of
+    Right s -> putStrLn "YAY"
+    Left e -> putStrLn e
+  where
+    getCommitParent ::  OS.Repo -> O.ObjectId -> ExceptT String IO (Set O.ObjectId)
+    getCommitParent repo x = do
       commitObj <- RM.readObjectFromFile repo x
       case commitObj of 
         O.CommitObj c -> return $ Set.unions $ fmap Set.singleton (O.parents c)
         _ -> return Set.empty
- 
+
 userInterface :: (RepoMonad m, Monad m, MonadIO m) => m()
 userInterface = go (OS.createRef) where
   go :: (RepoMonad m, Monad m, MonadIO m) => OS.RefStore -> m()
