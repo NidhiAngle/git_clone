@@ -52,8 +52,8 @@ b = N "B" [d,e,f]
 c = N "C" [f]
 a = N "A" [b,c]
 
-getParentSet :: Node -> Set Node
-getParentSet = Set.fromList . getParents
+getParentSet :: Node -> Either String (Set Node)
+getParentSet = Right . Set.fromList . getParents
 
 allTests :: Test
 allTests = TestList [simpleRangeTests, parentTests] 
@@ -64,27 +64,27 @@ parentTests = TestList [tSelfParent, tFirstParent, tSecondParent,
 
 tSelfParent :: Test
 tSelfParent = "A^0" ~: revParseTree [Ancestry a [Parent 0]] getParentSet ~?=
-      Set.fromList [a]
+      Right (Set.fromList [a])
 
 tFirstParent :: Test
 tFirstParent = "A^1" ~: revParseTree [Ancestry a [Parent 1]] getParentSet ~?= 
-      Set.fromList [b]
+      Right (Set.fromList [b])
 
 tSecondParent :: Test
 tSecondParent = "A^2" ~: revParseTree [Ancestry a [Parent 2]] getParentSet ~?= 
-      Set.fromList [c]
+      Right (Set.fromList [c])
 
 tFirstGrandParent :: Test
 tFirstGrandParent = "A^^" ~: revParseTree [Ancestry a [Parent 1, Parent 1]] 
-      getParentSet ~?= Set.fromList [d]
+      getParentSet ~?= Right (Set.fromList [d])
 
 tLongFamilyLine :: Test
 tLongFamilyLine = "A^^3^2" ~: revParseTree [Ancestry a [Parent 1, Parent 3, 
-      Parent 2]] getParentSet ~?= Set.fromList [j]
+      Parent 2]] getParentSet ~?= Right (Set.fromList [j])
 
 tTwoAncestors :: Test
 tTwoAncestors = "A~2" ~: revParseTree [Ancestry a [Ancestor 2]] getParentSet ~?=
-      Set.fromList [d]
+      Right (Set.fromList [d])
 
 simpleRangeTests :: Test
 simpleRangeTests = TestList [tSimpleRange1, tExcludeG, tExcludeD, tExcludeD2, 
@@ -93,36 +93,36 @@ simpleRangeTests = TestList [tSimpleRange1, tExcludeG, tExcludeD, tExcludeD2,
 
 tSimpleRange1 :: Test
 tSimpleRange1 = "D F" ~: revParseTree [RevId d, RevId f] getParentSet ~?=
-        Set.fromList [g, h, i, j, d, f]
+        Right (Set.fromList [g, h, i, j, d, f])
 
 tExcludeG :: Test
 tExcludeG = "^G D" ~: revParseTree [Exclude (RevId g), RevId d] getParentSet ~?=
-        Set.fromList [h,d]
+        Right (Set.fromList [h,d])
 
 tExcludeD :: Test
 tExcludeD = "^D B" ~: revParseTree [Exclude (RevId d), RevId b] getParentSet ~?=
-        Set.fromList [i,j, e, f, b]
+        Right (Set.fromList [i,j, e, f, b])
 
 tExcludeD2 :: Test
 tExcludeD2 = "^D B C" ~: revParseTree [Exclude (RevId d), RevId b, RevId c] 
-        getParentSet ~?= Set.fromList [i,j,e,f,b,c]
+        getParentSet ~?= Right (Set.fromList [i,j,e,f,b,c])
 
 tBSymmetricDiffC :: Test
 tBSymmetricDiffC = "B...C" ~: revParseTree [XOR (RevId b) (RevId c)] 
-        getParentSet ~?= Set.fromList [g,h,d,e,b,c]
+        getParentSet ~?= Right (Set.fromList [g,h,d,e,b,c])
 
 tEmptyDash :: Test
 tEmptyDash = "B^-" ~: revParseTree [Caret b (Dash 1)] getParentSet ~?=
-        Set.fromList [e,i,j,f,b]
+        Right (Set.fromList [e,i,j,f,b])
 
 tCaretHead :: Test
 tCaretHead = "C^@" ~: revParseTree [Caret c Head] getParentSet ~?= 
-        Set.fromList [i,j,f]
+        Right (Set.fromList [i,j,f])
 
 tCaretExclamation :: Test
 tCaretExclamation = "C^!" ~: revParseTree [Caret c Exclamation] getParentSet ~?=
-        Set.fromList [c]
+        Right (Set.fromList [c])
 
 tCaretExclamationRange :: Test
 tCaretExclamationRange = "F^! D" ~: revParseTree [Caret f Exclamation, RevId d] 
-        getParentSet ~?= Set.fromList [g,h,d,f]
+        getParentSet ~?= Right (Set.fromList [g,h,d,f])
