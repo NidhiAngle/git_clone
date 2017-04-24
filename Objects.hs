@@ -3,7 +3,7 @@ module Objects (
   ,ObjectId
   ,ObjectName
   ,EntryType
-  ,Commit(parents)
+  ,Commit(parents, dateTime)
   ,makeCommit
   ,makeTree-- COMMENT OUT LATER
   ,makeBlob-- COMMENT OUT LATER
@@ -46,7 +46,13 @@ data Commit = Commit {
  ,author   :: C.ByteString
  ,message  :: C.ByteString
  ,dateTime :: DT.UTCTime
-} deriving (Eq, Show)
+} deriving (Show)
+
+instance Eq Commit where
+ (==) c1 c2 = (==) (dateTime c1) (dateTime c2)
+
+instance Ord Commit where
+  compare c1 c2 = compare (dateTime c2) (dateTime c1)
 
 data Tree = Tree{
  entries  :: [(EntryType, ObjectId, ObjectName)] -- same object id but different file names?

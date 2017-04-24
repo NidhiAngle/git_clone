@@ -35,7 +35,7 @@ instance RepoMonad (ExceptT String IO) where
       case OS.readObject (inflate bs) of
         Just x  -> return x
         Nothing -> throwError $ "This object is not valid"
-    else throwError $ "This file does not exist"
+    else throwError $ "This file does not exist: " ++ filename
     where inflate blob = C.concat . 
                          B.toChunks . 
                          Zlib.decompress $ 
