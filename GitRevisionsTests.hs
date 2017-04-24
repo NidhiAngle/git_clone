@@ -87,9 +87,14 @@ tTwoAncestors = "A~2" ~: revParseTree [Ancestry a [Ancestor 2]] getParentSet ~?=
       Right (Set.fromList [d])
 
 simpleRangeTests :: Test
-simpleRangeTests = TestList [tSimpleRange1, tExcludeG, tExcludeD, tExcludeD2, 
-                             tBSymmetricDiffC, tEmptyDash, tCaretHead, 
-                             tCaretExclamation, tCaretExclamationRange]
+simpleRangeTests = TestList [tAllAncestors, tSimpleRange1, tExcludeG, tExcludeD, 
+							 tExcludeD2, tBSymmetricDiffC, tEmptyDash, 
+							 tCaretHead, tCaretExclamation, 
+							 tCaretExclamationRange]
+
+tAllAncestors :: Test 
+tAllAncestors = "A" ~: revParseTree [RevId a] getParentSet ~?=
+		Right (Set.fromList [a,b,c,d,e,f,g,h,i,j])
 
 tSimpleRange1 :: Test
 tSimpleRange1 = "D F" ~: revParseTree [RevId d, RevId f] getParentSet ~?=

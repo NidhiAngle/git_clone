@@ -1,7 +1,11 @@
 {-# OPTIONS -fwarn-tabs -fwarn-incomplete-patterns  #-}
 
-module GitRevisions (revParseTree, Relation(..), CaretQualifier(..), RevArg(..)
-                    ) where 
+module GitRevisions (
+  revParseTree, 
+  Relation(..), 
+  CaretQualifier(..), 
+  RevArg(..)
+) where 
 
 import Data.Set (Set)
 import qualified Data.Set as Set
