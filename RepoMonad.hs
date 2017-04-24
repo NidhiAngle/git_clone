@@ -72,7 +72,7 @@ instance RepoMonad (ExceptT String IO) where
     then do
       branchName <- liftIO $ C.readFile branchPath 
       return branchName
-    else throwError $ "Branch files do not exist"
+    else return (C.pack "")
     else throwError $ "HEAD file does not exist"
 
    
