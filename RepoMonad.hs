@@ -14,8 +14,7 @@ import Data.Monoid
 import System.Directory (createDirectoryIfMissing, listDirectory,
                          doesDirectoryExist,doesFileExist)
 import System.FilePath (splitFileName)
-
-
+import Data.Functor.Classes
 
 class RepoMonad m where
    readObjectFromFile :: OS.Repo -> O.ObjectId -> m O.Object
@@ -91,10 +90,3 @@ instance RepoMonad (ExceptT String IO) where
                            return $ OS.addRef ref (C.pack b) id
   
   repomappend x y = mappend <$> x <*> y 
-
--- instance (Monoid a) => Monoid (RepoMonad a)  where  
---     mempty = return mempty  
---     mappend = mappend
-
--- instance Monoid m => Monoid (ExceptT e m) where
---   mempty = mempty

@@ -63,38 +63,49 @@ commitDirectory filePath r =
 --readRefs OS.Repo    
 
 createEmptyRepo :: OS.Repo -> IO ()
-createEmptyRepo repo = Prelude.mapM_ (createDirectoryIfMissing True) folders
-    where folders = [repo ++ "/.hit/objects", repo ++ "/.hit/refs/heads"]
+createEmptyRepo repo = do
+  Prelude.mapM_ (createDirectoryIfMissing True) folders
+  Prelude.writeFile (repo ++ "/.hit/HEAD") "refs: refs/heads/master"
+  where folders = [repo ++ "/.hit/objects", repo ++ "/.hit/refs/heads"]
 
 initialize ::(RepoMonad m, Monad m, MonadIO m) => OS.Repo -> OS.RefStore -> m OS.RefStore
 initialize r ref = do
   dexists <- liftIO $ doesDirectoryExist (r ++ "/.hit") 
   if dexists then do
-    liftIO $ Prelude.putStrLn "Reinitializing git directory"
+--    liftIO $ Prelude.putStrLn "Reinitializing git directory"
     readRefs r ref
   else do
-    liftIO $ createEmptyRepo r >>
-             Prelude.putStrLn "Initializing git directory" >>
-             Prelude.writeFile (r ++ "/.git/refs/HEAD") "refs: refs/heads/master"
+    liftIO $ createEmptyRepo r             
     return ref
 
-userInterface :: (RepoMonad m, Monad m, MonadIO m) => m()
+commitPrep refMap msg = do 
+  refMap'  <- readRefs "./" refMap
+  head     <- getHeadRef "./"
+  commitId <- commit "./" [head] (C.pack "Brendon") 
+              (C.pack msg)
+  setHdres <- setHead "./" "master" commitId
+  return (refMap', commitId)
+
+userInterface :: IO ()
 userInterface = go (OS.createRef) where
-  go :: (RepoMonad m, Monad m, MonadIO m) => OS.RefStore -> m()
+  go :: OS.RefStore -> IO()
   go refMap = do
     liftIO $ Prelude.putStr "hit> "
     str <- liftIO $ Prelude.getLine
     case str of
-      "init" -> initialize "./" refMap >>= go
+      "init"   -> do
+                  r <- runExceptT (initialize "./" refMap) 
+                  case r of
+                    Left str      -> putStr str
+                    Right refMap  -> putStrLn ("Initialized hit repo") >> go refMap
       "commit" -> do
-                  refMap' <- readRefs "./" refMap
-                  head <- getHeadRef "./"
-                  commitId <- commit "./" [head] (C.pack "Brendon") 
-                              (C.pack "default msg")
-                  setHead "./" "master" commitId
-                  (liftIO ( putStrLn ("Commit ID: " ++ C.unpack commitId))) >> go refMap'
-      "exit" -> do 
-                 --print refMap
-                 return ()
-      _      -> (liftIO (Prelude.putStrLn "Unrecognized command")) >> go refMap
+                  putStrLn ("Please enter a commit message")
+                  msg    <- Prelude.getLine 
+                  result <- runExceptT $ commitPrep refMap msg
+                  case result of
+                    Right (r,c) -> putStrLn ("Commit ID: " ++ (C.unpack c)) >> go r
+                    Left str    -> putStrLn str
+      "exit" -> return ()
+      _      -> Prelude.putStrLn "Unrecognized command" >> go refMap
+
 
