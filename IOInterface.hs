@@ -36,7 +36,7 @@ commit r refs a m = do
   RM.writeObjectToFile r c
 
 
-commitDirectories :: (RepoMonad m, Monad m, MonadIO m ) => FilePath -> OS.Repo -> 
+commitDirectories :: (RepoMonad m, Monad m, MonadIO m) => FilePath -> OS.Repo -> 
                      m [(O.EntryType, O.ObjectId, O.ObjectName)]
 commitDirectories fp r = do 
     filePaths <- liftIO $ listDirectory fp
@@ -78,10 +78,11 @@ createEmptyRepo repo = do
   Prelude.writeFile (repo ++ "/.hit/HEAD") "refs: refs/heads/master"
   where folders = [repo ++ "/.hit/objects", repo ++ "/.hit/refs/heads"]
 
-initialize ::(RepoMonad m, Monad m, MonadIO m) => OS.Repo -> OS.RefStore -> m OS.RefStore
+initialize :: (RepoMonad m, Monad m, MonadIO m) => 
+              OS.Repo -> OS.RefStore -> m OS.RefStore
 initialize r ref = do
   dexists <- liftIO $ doesDirectoryExist (r ++ "/.hit") 
-  if dexists then do
+  if dexists then 
 --    liftIO $ Prelude.putStrLn "Reinitializing git directory"
     readRefs r ref
   else do
@@ -98,40 +99,58 @@ commitPrep refMap msg = do
   return (refMap', commitId)
 
 
+runIOExceptT :: ExceptT String IO a -> [IO ()] -> (a -> IO ()) -> IO ()
+runIOExceptT m g f = do
+        result <- runExceptT m
+        case result of
+            Right a -> f a
+            Left e -> foldl (>>) (putStrLn e) g 
 
 getLog :: OS.Repo -> OS.Ref -> IO ()
-getLog repo headRef = do
-  set <- runExceptT $ GR.revParseTree [GR.RevId headRef] (getCommitParent repo)
-  case set of
-    Right s -> putStrLn "YAY"
-    Left e -> putStrLn e
-  where
-    getCommitParent ::  OS.Repo -> O.ObjectId -> ExceptT String IO (Set O.ObjectId)
-    getCommitParent repo x = do
-      commitObj <- RM.readObjectFromFile repo x
-      case commitObj of 
-        O.CommitObj c -> return $ Set.unions $ fmap Set.singleton (O.parents c)
-        _ -> return Set.empty
+getLog repo headRef = 
+  runIOExceptT (RM.readObjectFromFile repo headRef) [] processHead where
+  processHead hc = 
+    case hc of
+      (O.CommitObj c) -> runIOExceptT 
+                           (GR.revParseTree [GR.RevId c] (getCommitParent repo)) 
+                          [] printLogs
+      _               -> putStrLn $ "Not a commit object" ++ C.unpack headRef
+  printLogs logSet = mapM_ (print . show) (Set.toList logSet)
+  
+
+getCommitParent ::  OS.Repo -> O.Commit -> ExceptT String IO (Set O.Commit)
+getCommitParent repo x =
+  case O.parents x of 
+        []       -> return Set.empty
+        xs       -> liftIO $ fmap Set.unions $ sequence $ 
+                      fmap (getCommitObject repo) xs
+
+    
+getCommitObject :: OS.Repo -> O.ObjectId -> IO (Set O.Commit)
+getCommitObject repo objId = do
+        commitObj <- runExceptT (RM.readObjectFromFile repo objId :: 
+                                  ExceptT String IO O.Object)
+        case commitObj of
+                (Right (O.CommitObj c)) -> return $ Set.singleton c
+                _ -> return Set.empty
 
 userInterface :: IO ()
-userInterface = go (OS.createRef) where
+userInterface = go OS.createRef where
   go :: OS.RefStore -> IO()
   go refMap = do
     liftIO $ Prelude.putStr "hit> "
-    str <- liftIO $ Prelude.getLine
+    str <- liftIO  Prelude.getLine
     case str of
-      "init"   -> do
-                  r <- runExceptT (initialize "./" refMap) 
-                  case r of
-                    Left str      -> putStr str
-                    Right refMap  -> putStrLn ("Initialized hit repo") >> go refMap
+      "init"   -> runIOExceptT (initialize "./" refMap) [go refMap] 
+                    ((putStrLn "Initialized hit repo" >>) . go)
       "commit" -> do
-                  putStrLn ("Please enter a commit message")
+                  putStrLn "Please enter a commit message" 
                   msg    <- Prelude.getLine 
-                  result <- runExceptT $ commitPrep refMap msg
-                  case result of
-                    Right (r,c) -> putStrLn ("Commit ID: " ++ (C.unpack c)) >> go r
-                    Left str    -> putStrLn str
+                  runIOExceptT (commitPrep refMap msg) [go refMap] 
+                    (\(r,c) -> putStrLn ("Commit ID: " ++ C.unpack c) >> go r)
+      "log"  -> runIOExceptT (RM.readRefs "./" refMap) [go refMap] 
+                  (\r -> runIOExceptT (RM.getHeadRef "./") [go refMap] 
+                     (\h -> getLog "./" h >> go r)) 
       "exit" -> return ()
       _      -> Prelude.putStrLn "Unrecognized command" >> go refMap
 
