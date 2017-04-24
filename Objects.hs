@@ -3,6 +3,7 @@ module Objects (
   ,ObjectId
   ,ObjectName
   ,EntryType
+  ,Commit(parents)
   ,makeCommit
   ,makeTree-- COMMENT OUT LATER
   ,makeBlob-- COMMENT OUT LATER
@@ -17,9 +18,13 @@ module Objects (
   ,makeTreeEntryType
 
 ) where 
-import Data.ByteString.Char8 as C
-import Data.Attoparsec.ByteString.Char8 as PB
+import qualified Data.ByteString.Char8 as C
+import qualified Data.Attoparsec.ByteString.Char8 as PB
 import Control.Applicative ((<|>))
+import qualified Data.Time.Clock as DT
+import qualified Data.Time.Format as DTF
+
+
 -- import Parser as PB
 -- import qualified ParserCombinators as PB
 --PARSER- BYTES TO STRING TO BYTES TO STORE 
@@ -40,6 +45,7 @@ data Commit = Commit {
  ,tree     :: ObjectId
  ,author   :: C.ByteString
  ,message  :: C.ByteString
+ ,dateTime :: DT.UTCTime
 } deriving (Eq, Show)
 
 data Tree = Tree{
@@ -51,57 +57,60 @@ data Blob = Blob{
  content :: C.ByteString
 } deriving (Eq, Show)
 
-makeCommit :: [ObjectId]-> ObjectId -> ByteString -> ByteString -> Object
-makeCommit ps n a m= CommitObj $ Commit ps n a m
+makeCommit :: [ObjectId]-> ObjectId -> C.ByteString -> C.ByteString -> DT.UTCTime -> Object
+makeCommit ps n a m t= CommitObj $ Commit ps n a m t
 
 makeTree :: [(EntryType, ObjectId, ObjectName)] -> Object
 makeTree  = TreeObj . Tree
 
-makeBlob :: ByteString -> Object
+makeBlob :: C.ByteString -> Object
 makeBlob = BlobObj . Blob
 
 makeTreeEntryType = TTree
 makeBlobEntryType = TBlob
 
-bytestr :: String -> PB.Parser ByteString
-bytestr s = string $ C.pack s
+bytestr :: String -> PB.Parser C.ByteString
+bytestr s = PB.string $ C.pack s
 
 constP :: String -> a -> PB.Parser a
 constP s a = fmap (const a) (bytestr s)
 
-nls :: PB.Parser ByteString
-nls = string (C.pack "\n") <|> string (C.pack " ")
+nls :: PB.Parser C.ByteString
+nls = PB.string (C.pack "\n") <|> PB.string (C.pack " ")
 
 parseParent :: PB.Parser C.ByteString
 parseParent = do
-  pid <- bytestr "parent " *> takeTill (== '\n')
+  pid <- bytestr "parent " *> PB.takeTill (== '\n')
   nls
   pure pid
 
 parseEntry :: PB.Parser (EntryType, ObjectId, ObjectName)
 parseEntry = do
   etype <- constP "blob " TBlob <|> constP "tree " TTree
-  id    <- takeTill (== ' ')
+  id    <- PB.takeTill (== ' ')
   nls
-  name  <- takeTill (== '\n') 
+  name  <- PB.takeTill (== '\n') 
   nls
   pure (etype, id, name)
 
 parseCommit :: PB.Parser Commit 
 parseCommit = do
-  parents <- many' parseParent
-  tree    <- bytestr "tree " *> takeTill (== '\n')
+  parents <- PB.many' parseParent
+  tree    <- bytestr "tree " *> PB.takeTill (== '\n')
   nls
-  author  <- bytestr "author " *> takeTill (== '\n')
+  author  <- bytestr "author " *> PB.takeTill (== '\n')
   nls
   nls
-  msg     <- takeTill (== '\n')
+  msg     <- PB.takeTill (== '\n')
   nls
-  pure $ Commit parents tree author msg
+  time    <- bytestr "time " *> PB.takeTill (== '\n')
+  nls
+  let dateTime = DTF.parseTimeOrError True DTF.defaultTimeLocale "%s" (C.unpack time)
+  pure $ Commit parents tree author msg dateTime
 
 parseTree :: PB.Parser Tree
 parseTree = do
-  entries <- many' parseEntry
+  entries <- PB.many' parseEntry
   pure $ Tree entries
 
 
@@ -119,6 +128,7 @@ toLineCommit c = Prelude.foldl (\b x -> b `C.append` helper "parent " x)
                  `C.append` helper "tree " (tree c) 
                  `C.append` helper "author " (author c)
                  `C.append` helper "msg" (message c)
+                 `C.append` helper "time " (C.pack (DTF.formatTime DTF.defaultTimeLocale "%s" (dateTime c)))
   where
     helper "msg" x    = C.pack "\n" `C.append` x `C.append` C.pack "\n"
     helper str x   = C.pack str `C.append` x `C.append` C.pack "\n"

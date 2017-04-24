@@ -8,6 +8,13 @@ import qualified Codec.Compression.Zlib as Zlib
 import qualified Data.ByteString.Lazy as B
 import qualified ObjectStore as OS
 import qualified Data.ByteString.Char8 as C
+import qualified GitRevisions as GR
+import qualified RepoMonad as RM
+import Data.List (sortOn)
+import Data.Set (Set)
+import qualified Data.Set as Set
+import qualified Data.Time.Clock as DT
+import qualified Data.Time.Format as DTF
 import Control.Monad 
 import Control.Monad.Except
 import System.Directory (createDirectoryIfMissing, listDirectory,
@@ -17,14 +24,17 @@ import RepoMonad
 type Author = C.ByteString
 type Message = C.ByteString
 
-commit ::  (RepoMonad m, Monad m, MonadIO m ) => 
+
+commit ::  (RepoMonad m, Monad m, MonadIO m) => 
            OS.Repo -> [OS.Ref] -> Author -> Message -> m O.ObjectId
 commit r refs a m = do
   objectIds <- commitDirectories r r
   let tree = O.makeTree objectIds
-  filename <- writeObjectToFile r tree
-  let c = O.makeCommit refs filename a m
-  writeObjectToFile r c
+  filename <- RM.writeObjectToFile r tree
+  utc <- liftIO DT.getCurrentTime
+  let c = O.makeCommit refs filename a m utc
+  RM.writeObjectToFile r c
+
 
 commitDirectories :: (RepoMonad m, Monad m, MonadIO m ) => FilePath -> OS.Repo -> 
                      m [(O.EntryType, O.ObjectId, O.ObjectName)]
@@ -49,12 +59,12 @@ commitDirectory filePath r =
     (True, _) -> do 
         objectIds <- commitDirectories filePath r
         let tree = O.makeTree objectIds
-        filename <- writeObjectToFile r tree
+        filename <- RM.writeObjectToFile r tree
         return $ Just (O.makeTreeEntryType, filename, C.pack filePath)
     (_, True) -> do
          contents <- liftIO $ C.readFile filePath
          let blob = O.makeBlob contents
-         fileName <- writeObjectToFile r blob
+         fileName <- RM.writeObjectToFile r blob
          return $ Just (O.makeBlobEntryType, fileName, C.pack filePath)
     (_,_)  ->  return Nothing 
 
@@ -78,6 +88,7 @@ initialize r ref = do
     liftIO $ createEmptyRepo r             
     return ref
 
+
 commitPrep refMap msg = do 
   refMap'  <- readRefs "./" refMap
   head     <- getHeadRef "./"
@@ -85,6 +96,22 @@ commitPrep refMap msg = do
               (C.pack msg)
   setHdres <- setHead "./" "master" commitId
   return (refMap', commitId)
+
+
+
+getLog :: OS.Repo -> OS.Ref -> IO ()
+getLog repo headRef = do
+  set <- runExceptT $ GR.revParseTree [GR.RevId headRef] (getCommitParent repo)
+  case set of
+    Right s -> putStrLn "YAY"
+    Left e -> putStrLn e
+  where
+    getCommitParent ::  OS.Repo -> O.ObjectId -> ExceptT String IO (Set O.ObjectId)
+    getCommitParent repo x = do
+      commitObj <- RM.readObjectFromFile repo x
+      case commitObj of 
+        O.CommitObj c -> return $ Set.unions $ fmap Set.singleton (O.parents c)
+        _ -> return Set.empty
 
 userInterface :: IO ()
 userInterface = go (OS.createRef) where
