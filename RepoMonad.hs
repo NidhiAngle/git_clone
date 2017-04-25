@@ -14,21 +14,24 @@ import Data.Monoid
 import System.Directory (createDirectoryIfMissing, listDirectory,
                          doesDirectoryExist,doesFileExist)
 import System.FilePath (splitFileName)
-
-
+import Data.Functor.Classes
+import Control.Monad.Trans.Reader
 
 class RepoMonad m where
-   readObjectFromFile :: OS.Repo -> O.ObjectId -> m O.Object
-   writeObjectToFile :: OS.Repo -> O.Object -> m O.ObjectId
-   writeObject :: OS.Repo -> O.Object -> m String
-   getHeadRef :: OS.Repo -> m OS.Ref
-   setHead :: OS.Repo -> OS.Branch -> OS.Ref -> m ()
-   readRefs :: OS.Repo -> OS.RefStore -> m OS.RefStore
+   readObjectFromFile :: O.ObjectId -> m O.Object
+   writeObjectToFile :: O.Object -> m O.ObjectId
+   writeObject :: O.Object -> m String
+   getHeadRef :: m OS.Ref
+   getRepo :: m OS.Repo
+   setHead :: OS.Branch -> OS.Ref -> m ()
+   readRefs :: OS.RefStore -> m OS.RefStore
    repomappend :: (Monoid a) => m a -> m a -> m a
 
-instance RepoMonad (ExceptT String IO) where
+type RepoState = ReaderT OS.Repo (ExceptT String IO)
 
-  readObjectFromFile r id = do 
+instance RepoMonad (RepoState) where
+  readObjectFromFile id = do
+    r <- ask 
     let filename = OS.getObjPath r id 
     exists <- liftIO $ doesFileExist filename
     if exists then do
@@ -36,34 +39,38 @@ instance RepoMonad (ExceptT String IO) where
       case OS.readObject (inflate bs) of
         Just x  -> return x
         Nothing -> throwError $ "This object is not valid"
-    else throwError $ "This file does not exist"
+    else throwError $ "This file does not exist: " ++ filename
     where inflate blob = C.concat . 
                          B.toChunks . 
                          Zlib.decompress $ 
                          B.fromChunks [blob] 
 
-  writeObjectToFile r o = do
+  writeObjectToFile o = do
+    r <- ask
     let (path, name, content) = OS.exportObject r o
     liftIO $ createDirectoryIfMissing True path  
     liftIO $ B.writeFile (OS.getObjPath r name) (compress content)
-
     return name
     where
         compress :: C.ByteString -> B.ByteString
         compress mx = (Zlib.compress . B.fromChunks) [mx]
 
-  writeObject r o = do
+  writeObject o = do
+    r <- ask
     let (path, name, content) = OS.exportObject r o
     return $ C.unpack content
 
+  getRepo = ask
 
   
 -- First one else where??
-  setHead r b ref = do
+  setHead b ref = do
+    r <- ask
     liftIO $ C.writeFile (r ++ "/.hit/refs/heads/" ++ b) ref 
     liftIO $ C.writeFile (r ++ "/.hit/" ++ "HEAD") (C.pack ("refs/heads/" ++ b))
 
-  getHeadRef r = do
+  getHeadRef = do
+    r <- ask
     isFile <- liftIO $ doesFileExist $ r ++ ".hit/HEAD" 
     if isFile then do
     branch <- liftIO $ C.readFile (r ++ ".hit/HEAD")
@@ -73,28 +80,21 @@ instance RepoMonad (ExceptT String IO) where
     then do
       branchName <- liftIO $ C.readFile branchPath 
       return branchName
-    else throwError $ "Branch files do not exist"
+    else return (C.pack "")
     else throwError $ "HEAD file does not exist"
 
-   
   
-  readRefs repo ref = do
-    exists   <- liftIO $ doesDirectoryExist (repo ++ "/.hit/refs/heads")
+  readRefs ref = do
+    r <- ask
+    exists   <- liftIO $ doesDirectoryExist (r ++ "/.hit/refs/heads")
     if exists then do
-      branches <- liftIO $ listDirectory (repo ++ "/.hit/refs/heads")
-      addRefs branches 
+      branches <- liftIO $ listDirectory (r ++ "/.hit/refs/heads")
+      addRefs branches r 
     else throwError $ "refs/heads does not exist, no new refs added to store"
     where
-        addRefs []     = return ref
-        addRefs (b:bs) = do
-                           id <- liftIO $ C.readFile (repo ++ "/.hit/refs/heads/" ++ b)
+        addRefs [] _     = return ref
+        addRefs (b:bs) r = do
+                           id <- liftIO $ C.readFile (r ++ "/.hit/refs/heads/" ++ b)
                            return $ OS.addRef ref (C.pack b) id
   
   repomappend x y = mappend <$> x <*> y 
-
--- instance (Monoid a) => Monoid (RepoMonad a)  where  
---     mempty = return mempty  
---     mappend = mappend
-
--- instance Monoid m => Monoid (ExceptT e m) where
---   mempty = mempty

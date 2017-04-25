@@ -17,6 +17,7 @@ import qualified Data.Time.Clock as DT
 import qualified Data.Time.Format as DTF
 import Control.Monad 
 import Control.Monad.Except
+import Control.Monad.Trans.Reader
 import System.Directory (createDirectoryIfMissing, listDirectory,
                          doesDirectoryExist,doesFileExist)
 import System.FilePath (splitFileName)
@@ -25,46 +26,47 @@ type Author = C.ByteString
 type Message = C.ByteString
 
 
-commit ::  (RepoMonad m, Monad m, MonadIO m) => 
-           OS.Repo -> [OS.Ref] -> Author -> Message -> m O.ObjectId
-commit r refs a m = do
-  objectIds <- commitDirectories r r
+commit :: (RepoMonad m) => [OS.Ref] -> Author -> Message -> m O.ObjectId
+commit refs a m = do
+  r <- getRepo
+  objectIds <- commitDirectories r
   let tree = O.makeTree objectIds
-  filename <- RM.writeObjectToFile r tree
+  filename <- RM.writeObjectToFile tree
   utc <- liftIO DT.getCurrentTime
   let c = O.makeCommit refs filename a m utc
-  RM.writeObjectToFile r c
+  RM.writeObjectToFile c
 
 
-commitDirectories :: (RepoMonad m, Monad m, MonadIO m ) => FilePath -> OS.Repo -> 
-                     m [(O.EntryType, O.ObjectId, O.ObjectName)]
-commitDirectories fp r = do 
+commitDirectories :: (RepoMonad m) => FilePath -> m [O.TreeEntry]
+commitDirectories fp = do
+    r <- getRepo 
     filePaths <- liftIO $ listDirectory fp
-    foldr commit' (return []) filePaths where
-    commit' dir acc = commitEachDirectory dir r `repomappend` acc
-    commitEachDirectory filepath r = do
-        entry <- commitDirectory filepath r
+    return $ foldr commit' [] filePaths where
+    commit' dir acc = commitEachDirectory dir `mappend` acc
+    commitEachDirectory :: FilePath -> [O.TreeEntry]
+    commitEachDirectory filepath = do
+        entry <- commitDirectory filepath
         case entry of
-          Just x  -> return [x]
-          Nothing -> return []
+          Just x  -> [x]
+          Nothing -> []
 
 
-commitDirectory :: (RepoMonad m, Monad m, MonadIO m ) => FilePath -> OS.Repo -> 
-                   m (Maybe (O.EntryType, O.ObjectId, O.ObjectName))
-commitDirectory filePath r = 
+commitDirectory :: (RepoMonad m) => FilePath -> m (Maybe O.TreeEntry)
+commitDirectory filePath = do
+  r <- getRepo 
   if (head . snd . splitFileName) filePath == '.' then return Nothing else do
   isDirectory <- liftIO $ doesDirectoryExist filePath
   isFile <- liftIO $ doesFileExist filePath 
   case (isDirectory, isFile) of  
     (True, _) -> do 
-        objectIds <- commitDirectories filePath r
+        objectIds <- commitDirectories filePath
         let tree = O.makeTree objectIds
-        filename <- RM.writeObjectToFile r tree
+        filename <- RM.writeObjectToFile tree
         return $ Just (O.makeTreeEntryType, filename, C.pack filePath)
     (_, True) -> do
          contents <- liftIO $ C.readFile filePath
          let blob = O.makeBlob contents
-         fileName <- RM.writeObjectToFile r blob
+         fileName <- RM.writeObjectToFile blob
          return $ Just (O.makeBlobEntryType, fileName, C.pack filePath)
     (_,_)  ->  return Nothing 
 
@@ -72,54 +74,88 @@ commitDirectory filePath r =
 --ASSUMPTION NO REMOTES
 --readRefs OS.Repo    
 
-createEmptyRepo :: OS.Repo -> IO ()
-createEmptyRepo repo = Prelude.mapM_ (createDirectoryIfMissing True) folders
-    where folders = [repo ++ "/.hit/objects", repo ++ "/.hit/refs/heads"]
+createEmptyRepo :: (RepoMonad m) => m (IO ())
+createEmptyRepo = do
+  repo <- getRepo
+  liftIO $ Prelude.mapM_ (createDirectoryIfMissing True) (folders repo)
+  return $ Prelude.writeFile (repo ++ "/.hit/HEAD") "refs: refs/heads/master"
+  where folders repo = [repo ++ "/.hit/objects", repo ++ "/.hit/refs/heads"]
 
-initialize ::(RepoMonad m, Monad m, MonadIO m) => OS.Repo -> OS.RefStore -> m OS.RefStore
-initialize r ref = do
+initialize ::  (RepoMonad m) => OS.RefStore -> m OS.RefStore
+initialize ref = do
+  r <- getRepo
   dexists <- liftIO $ doesDirectoryExist (r ++ "/.hit") 
-  if dexists then do
-    liftIO $ Prelude.putStrLn "Reinitializing git directory"
-    readRefs r ref
+  if dexists then 
+    readRefs ref
   else do
-    liftIO $ createEmptyRepo r >>
-             Prelude.putStrLn "Initializing git directory" >>
-             Prelude.writeFile (r ++ "/.git/refs/HEAD") "refs: refs/heads/master"
+    createEmptyRepo             
     return ref
 
+commitPrep refMap msg = do 
+  refMap'  <- readRefs refMap
+  head     <- getHeadRef
+  commitId <- commit [head] (C.pack "Brendon") (C.pack msg)
+  setHdres <- setHead "master" commitId
+  return (refMap', commitId)
 
-getLog :: OS.Repo -> OS.Ref -> IO ()
-getLog repo headRef = do
-  set <- runExceptT $ GR.revParseTree [GR.RevId headRef] (getCommitParent repo)
-  case set of
-    Right s -> putStrLn "YAY"
-    Left e -> putStrLn e
+runIOExceptT :: ExceptT String IO a -> [IO ()] -> (a -> IO ()) -> IO ()
+runIOExceptT m g f = do
+        result <- runExceptT m
+        case result of
+            Right a -> f a
+            Left e -> foldl (>>) (putStrLn e) g 
+
+getLog :: (RepoMonad m) => m (IO ())
+getLog = do 
+  headRef <- getHeadRef
+  headCommit <- RM.readObjectFromFile headRef
+  case headCommit of
+    (O.CommitObj c) -> return $ runIOExceptT 
+                       (GR.revParseTree [GR.RevId c] getCommitParent) 
+                       [] printLogs
+    _               -> return $putStrLn $ "Not a commit object" ++ C.unpack headRef
   where
-    getCommitParent ::  OS.Repo -> O.ObjectId -> ExceptT String IO (Set O.ObjectId)
-    getCommitParent repo x = do
-      commitObj <- RM.readObjectFromFile repo x
-      case commitObj of 
-        O.CommitObj c -> return $ Set.unions $ fmap Set.singleton (O.parents c)
-        _ -> return Set.empty
+  printLogs logSet = mapM_ (print . show) (Set.toList logSet)
+  
 
-userInterface :: (RepoMonad m, Monad m, MonadIO m) => m()
-userInterface = go (OS.createRef) where
-  go :: (RepoMonad m, Monad m, MonadIO m) => OS.RefStore -> m()
+getCommitParent ::  (RepoMonad m) => O.Commit -> m (Set O.Commit)
+getCommitParent x = 
+  case O.parents x of 
+        [] -> return Set.empty
+        xs -> do 
+              singletons <- sequence $ fmap getCommitObject xs
+              return $ Set.unions singletons
+
+    
+getCommitObject :: (RepoMonad m) => O.ObjectId -> m (Set O.Commit)
+getCommitObject objId = do
+  commitObj <- RM.readObjectFromFile objId  
+  case commitObj of
+    (O.CommitObj c) -> return $ Set.singleton c
+    _ -> return Set.empty
+
+userInterface :: IO ()
+userInterface = go OS.createRef where
+  go :: OS.RefStore -> IO()
   go refMap = do
     liftIO $ Prelude.putStr "hit> "
-    str <- liftIO $ Prelude.getLine
+    str <- liftIO  Prelude.getLine
     case str of
-      "init" -> initialize "./" refMap >>= go
+      "init"   -> runIOExceptT (runReaderT (initialize refMap) "./") [go refMap] 
+                    ((putStrLn "Initialized hit repo" >>) . go)
       "commit" -> do
-                  refMap' <- readRefs "./" refMap
-                  head <- getHeadRef "./"
-                  commitId <- commit "./" [head] (C.pack "Brendon") 
-                              (C.pack "default msg")
-                  setHead "./" "master" commitId
-                  (liftIO ( putStrLn ("Commit ID: " ++ C.unpack commitId))) >> go refMap'
-      "exit" -> do 
-                 --print refMap
-                 return ()
-      _      -> (liftIO (Prelude.putStrLn "Unrecognized command")) >> go refMap
+                  putStrLn "Please enter a commit message" 
+                  msg    <- getLine 
+                  runIOExceptT (commitPrep refMap msg) [go refMap] 
+                    (\(r,c) -> putStrLn ("Commit ID: " ++ C.unpack c) >> go r)
+      "log"    -> runIOExceptT (runReaderT (RM.readRefs refMap) "./") [go refMap] 
+                    (\r -> runIOExceptT (runReaderT RM.getHeadRef "./") [go refMap] 
+                      (\h -> getLog h >> go r)) 
+      "branch" -> do
+                  putStrLn "Enter branch name"
+                  branchName <- getLine
+                  putStrLn "okay" >> go refMap
+      "exit"   -> return ()
+      _        -> Prelude.putStrLn "Unrecognized command" >> go refMap
+
 
