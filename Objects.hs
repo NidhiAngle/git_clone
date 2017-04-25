@@ -4,7 +4,7 @@ module Objects (
   ,ObjectName
   ,EntryType
   ,TreeEntry
-  ,Commit(parents, dateTime)
+  ,Commit(parents, dateTime, tree)
   ,makeCommit
   ,makeTree-- COMMENT OUT LATER
   ,makeBlob-- COMMENT OUT LATER
@@ -58,6 +58,7 @@ instance Ord Commit where
 type TreeEntry = (EntryType, ObjectId, ObjectName)
 
 data Tree = Tree{
+ name :: C.ByteString,
  entries  :: [TreeEntry] -- same object id but different file names?
                                                  -- to prevent commit in tree
 } deriving (Eq, Show)
@@ -69,8 +70,8 @@ data Blob = Blob{
 makeCommit :: [ObjectId]-> ObjectId -> C.ByteString -> C.ByteString -> DT.UTCTime -> Object
 makeCommit ps n a m t= CommitObj $ Commit ps n a m t
 
-makeTree :: [TreeEntry] -> Object
-makeTree  = TreeObj . Tree
+makeTree :: C.ByteString -> [TreeEntry] -> Object
+makeTree n es = TreeObj $ Tree n es
 
 makeBlob :: C.ByteString -> Object
 makeBlob = BlobObj . Blob
@@ -119,8 +120,10 @@ parseCommit = do
 
 parseTree :: PB.Parser Tree
 parseTree = do
+  name <- bytestr "name " *> PB.takeTill (== '\n')
+  nls
   entries <- PB.many' parseEntry
-  pure $ Tree entries
+  pure $ Tree name entries
 
 
 
@@ -145,7 +148,7 @@ toLineCommit c = Prelude.foldl (\b x -> b `C.append` helper "parent " x)
 -- pretty printer for tree objects, for example, to write to files
 -- put in object?
 toLineTree :: Tree -> C.ByteString 
-toLineTree t = Prelude.foldl helper (C.pack "") (entries t)
+toLineTree t = Prelude.foldl helper (C.pack "name " `C.append` (name t) `C.append` C.pack "\n") (entries t)
   where 
     helper base (x, id, name) = case x of
       TBlob -> base `C.append` C.pack "blob " `C.append` id `C.append` 

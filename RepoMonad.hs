@@ -16,23 +16,31 @@ import System.Directory (createDirectoryIfMissing, listDirectory,
 import System.FilePath (splitFileName)
 import Data.Functor.Classes
 import Control.Monad.Trans.Reader
+import qualified Data.Time.Clock as DT
+
+type Author = C.ByteString
+type Message = C.ByteString
 
 class (Monad m) => RepoMonad m where
    readObjectFromFile :: O.ObjectId -> m O.Object
    writeObjectToFile :: O.Object -> m O.ObjectId
-   writeObject :: O.Object -> m String
+   writeObject :: O.Object -> m O.ObjectId
    getHeadRef :: m OS.Ref
    addBranch :: FilePath -> m OS.Ref
    getRepo :: m OS.Repo
    setHead :: OS.Branch -> OS.Ref -> m ()
    readRefs :: OS.RefStore -> m OS.RefStore
+   workingDirectoryId :: (O.Object -> m O.ObjectId) -> m O.ObjectId
+   isWorkingDirectoryDirty :: m Bool
+   switchToBranch :: O.ObjectId -> m (IO ())
+   commit :: (O.Object -> m O.ObjectId) -> [OS.Ref] -> Author -> Message -> m O.ObjectId
    repomappend :: (Monoid a) => m a -> m a -> m a
 
 type RepoState = ReaderT OS.Repo (ExceptT String IO)
 
 instance RepoMonad (RepoState) where
   readObjectFromFile id = do
-    r <- ask 
+    r <- getRepo
     let filename = OS.getObjPath r id 
     exists <- liftIO $ doesFileExist filename
     if exists then do
@@ -47,7 +55,7 @@ instance RepoMonad (RepoState) where
                          B.fromChunks [blob] 
 
   writeObjectToFile o = do
-    r <- ask
+    r <- getRepo
     let (path, name, content) = OS.exportObject r o
     liftIO $ createDirectoryIfMissing True path  
     liftIO $ B.writeFile (OS.getObjPath r name) (compress content)
@@ -57,27 +65,79 @@ instance RepoMonad (RepoState) where
         compress mx = (Zlib.compress . B.fromChunks) [mx]
 
   writeObject o = do
-    r <- ask
+    r <- getRepo
     let (path, name, content) = OS.exportObject r o
-    return $ C.unpack content
+    return name
+
+  isWorkingDirectoryDirty = do
+    hr <- getHeadRef
+    let o = OS.readObject hr
+    case o of
+      Just o' -> case o' of
+        (O.CommitObj c) -> do
+                         cwd <- workingDirectoryId writeObject
+                         return $ O.tree c == cwd
+        _ -> throwError "Expecting a commit object type"  
+      Nothing -> throwError "Unable to find HEAD ref"
+
+  workingDirectoryId f = do
+    r <- getRepo
+    treeEntries <- traverseDirectories f r
+    let tree = O.makeTree (C.pack r) treeEntries
+    f tree where
+      traverseDirectories f fp = do
+          filePaths <- liftIO $ fmap (fmap ((++) (fp++"/"))) $ listDirectory fp
+          foldr examine (return []) filePaths where
+          examine dir = liftM2 mappend (examineEachDirectory f dir) 
+          examineEachDirectory f filepath = do
+              entry <- examineDirectory f filepath
+              case entry of
+                Just x  -> return [x]
+                Nothing -> return []
+      examineDirectory f filePath = do
+        isDirectory <- liftIO $ doesDirectoryExist filePath
+        isFile <- liftIO $ doesFileExist filePath 
+        case (isDirectory, isFile) of  
+          (True, _) -> do 
+              treeEntries <- traverseDirectories f filePath
+              let tree = O.makeTree (C.pack filePath) treeEntries 
+              filename <- f tree
+              return $ Just (O.makeTreeEntryType, filename, C.pack filePath)
+          (_, True) -> do
+               contents <- liftIO $ C.readFile filePath
+               let blob = O.makeBlob contents
+               fileName <- f blob
+               return $ Just (O.makeBlobEntryType, fileName, C.pack filePath)
+          (_,_)  ->  return Nothing 
+
+  commit f refs a m = do
+    filename <- workingDirectoryId f
+    utc <- liftIO DT.getCurrentTime
+    let c = O.makeCommit refs filename a m utc
+    f c 
+
+  switchToBranch ref = do
+    r <- getRepo
+    return $ putStrLn "yay!"
+
+
+
 
   getRepo = ask
 
-  
--- First one else where??
   setHead b ref = do
-    r <- ask
+    r <- getRepo
     liftIO $ C.writeFile (r ++ "/.hit/refs/heads/" ++ b) ref 
     liftIO $ C.writeFile (r ++ "/.hit/" ++ "HEAD") (C.pack ("refs/heads/" ++ b))
 
   addBranch b = do
-  	r <- ask
-  	hr <- getHeadRef
-  	liftIO $ C.writeFile (r ++ "/.hit/refs/heads/" ++ b) hr
-  	return hr
+        r <- getRepo
+        hr <- getHeadRef
+        liftIO $ C.writeFile (r ++ "/.hit/refs/heads/" ++ b) hr
+        return hr
 
   getHeadRef = do
-    r <- ask
+    r <- getRepo
     isFile <- liftIO $ doesFileExist $ r ++ ".hit/HEAD" 
     if isFile then do
     branch <- liftIO $ C.readFile (r ++ ".hit/HEAD")
@@ -106,3 +166,8 @@ instance RepoMonad (RepoState) where
                            addRefs bs (OS.addRef ref (C.pack b) id)
   
   repomappend x y = mappend <$> x <*> y 
+
+
+
+
+
