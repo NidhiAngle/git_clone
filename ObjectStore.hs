@@ -13,6 +13,7 @@ module ObjectStore(
  ,getObjPath
  ,exportObject
  ,readObject
+ ,hashContent
   ) where
 import "cryptohash" Crypto.Hash
 import Data.ByteString.Char8 as C
@@ -51,6 +52,7 @@ hexSha256 bs = digestToHexByteString (hash bs :: Digest SHA256)
 
 -- Given object, adds header and hashes to give
 -- id and new content
+
 hashContent :: O.Object-> (O.ObjectId, C.ByteString)
 hashContent obj = do
   let content          = objToByte obj
