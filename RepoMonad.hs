@@ -17,7 +17,7 @@ import System.FilePath (splitFileName)
 import Data.Functor.Classes
 import Control.Monad.Trans.Reader
 
-class RepoMonad m where
+class (Monad m) => RepoMonad m where
    readObjectFromFile :: O.ObjectId -> m O.Object
    writeObjectToFile :: O.Object -> m O.ObjectId
    writeObject :: O.Object -> m String

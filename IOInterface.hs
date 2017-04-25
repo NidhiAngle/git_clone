@@ -26,7 +26,8 @@ type Author = C.ByteString
 type Message = C.ByteString
 
 
-commit :: (RepoMonad m) => [OS.Ref] -> Author -> Message -> m O.ObjectId
+commit :: (RepoMonad m, MonadIO m) => 
+          [OS.Ref] -> Author -> Message -> m O.ObjectId
 commit refs a m = do
   r <- getRepo
   objectIds <- commitDirectories r
@@ -37,21 +38,20 @@ commit refs a m = do
   RM.writeObjectToFile c
 
 
-commitDirectories :: (RepoMonad m) => FilePath -> m [O.TreeEntry]
+commitDirectories :: (RepoMonad m, MonadIO m) => FilePath -> m [O.TreeEntry]
 commitDirectories fp = do
     r <- getRepo 
     filePaths <- liftIO $ listDirectory fp
-    return $ foldr commit' [] filePaths where
-    commit' dir acc = commitEachDirectory dir `mappend` acc
-    commitEachDirectory :: FilePath -> [O.TreeEntry]
+    foldr commit' (return []) filePaths where
+    commit' dir = liftM2 mappend (commitEachDirectory dir) 
     commitEachDirectory filepath = do
         entry <- commitDirectory filepath
         case entry of
-          Just x  -> [x]
-          Nothing -> []
+          Just x  -> return [x]
+          Nothing -> return []
 
 
-commitDirectory :: (RepoMonad m) => FilePath -> m (Maybe O.TreeEntry)
+commitDirectory :: (RepoMonad m, MonadIO m) => FilePath -> m (Maybe O.TreeEntry)
 commitDirectory filePath = do
   r <- getRepo 
   if (head . snd . splitFileName) filePath == '.' then return Nothing else do
@@ -74,14 +74,14 @@ commitDirectory filePath = do
 --ASSUMPTION NO REMOTES
 --readRefs OS.Repo    
 
-createEmptyRepo :: (RepoMonad m) => m (IO ())
+createEmptyRepo :: (RepoMonad m, MonadIO m) => m (IO ())
 createEmptyRepo = do
   repo <- getRepo
   liftIO $ Prelude.mapM_ (createDirectoryIfMissing True) (folders repo)
   return $ Prelude.writeFile (repo ++ "/.hit/HEAD") "refs: refs/heads/master"
   where folders repo = [repo ++ "/.hit/objects", repo ++ "/.hit/refs/heads"]
 
-initialize ::  (RepoMonad m) => OS.RefStore -> m OS.RefStore
+initialize ::  (RepoMonad m, MonadIO m) => OS.RefStore -> m OS.RefStore
 initialize ref = do
   r <- getRepo
   dexists <- liftIO $ doesDirectoryExist (r ++ "/.hit") 
@@ -110,10 +110,11 @@ getLog = do
   headRef <- getHeadRef
   headCommit <- RM.readObjectFromFile headRef
   case headCommit of
-    (O.CommitObj c) -> return $ runIOExceptT 
-                       (GR.revParseTree [GR.RevId c] getCommitParent) 
-                       [] printLogs
-    _               -> return $putStrLn $ "Not a commit object" ++ C.unpack headRef
+    (O.CommitObj c) -> do
+                       commitLog <- GR.revParseTree [GR.RevId c] getCommitParent 
+                       return $ printLogs commitLog 
+    _               -> return $ putStrLn $ "Not a commit object" ++ 
+                                            C.unpack headRef
   where
   printLogs logSet = mapM_ (print . show) (Set.toList logSet)
   
@@ -122,8 +123,10 @@ getCommitParent ::  (RepoMonad m) => O.Commit -> m (Set O.Commit)
 getCommitParent x = 
   case O.parents x of 
         [] -> return Set.empty
-        xs -> do 
-              singletons <- sequence $ fmap getCommitObject xs
+        (x:xs) ->
+              if x == C.pack "" -- hacky way to check for base case
+              then return Set.empty else do  
+              singletons <- sequence $ fmap getCommitObject (x:xs)
               return $ Set.unions singletons
 
     
@@ -141,16 +144,23 @@ userInterface = go OS.createRef where
     liftIO $ Prelude.putStr "hit> "
     str <- liftIO  Prelude.getLine
     case str of
-      "init"   -> runIOExceptT (runReaderT (initialize refMap) "./") [go refMap] 
+      "init"   -> runIOExceptT
+                    (runReaderT (initialize refMap :: 
+                                  RepoState OS.RefStore) "./")
+                    [go refMap] 
                     ((putStrLn "Initialized hit repo" >>) . go)
       "commit" -> do
                   putStrLn "Please enter a commit message" 
                   msg    <- getLine 
-                  runIOExceptT (commitPrep refMap msg) [go refMap] 
+                  runIOExceptT 
+                    (runReaderT (commitPrep refMap msg :: 
+                                 RepoState (OS.RefStore, O.ObjectId)) "./")
+                    [go refMap] 
                     (\(r,c) -> putStrLn ("Commit ID: " ++ C.unpack c) >> go r)
-      "log"    -> runIOExceptT (runReaderT (RM.readRefs refMap) "./") [go refMap] 
-                    (\r -> runIOExceptT (runReaderT RM.getHeadRef "./") [go refMap] 
-                      (\h -> getLog h >> go r)) 
+      "log"    ->  runIOExceptT 
+                    (runReaderT (getLog :: RepoState (IO ())) "./") 
+                    [go refMap] 
+                    (>> go refMap)
       "branch" -> do
                   putStrLn "Enter branch name"
                   branchName <- getLine
