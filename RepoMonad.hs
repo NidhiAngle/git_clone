@@ -22,6 +22,7 @@ class (Monad m) => RepoMonad m where
    writeObjectToFile :: O.Object -> m O.ObjectId
    writeObject :: O.Object -> m String
    getHeadRef :: m OS.Ref
+   addBranch :: FilePath -> m OS.Ref
    getRepo :: m OS.Repo
    setHead :: OS.Branch -> OS.Ref -> m ()
    readRefs :: OS.RefStore -> m OS.RefStore
@@ -68,6 +69,12 @@ instance RepoMonad (RepoState) where
     r <- ask
     liftIO $ C.writeFile (r ++ "/.hit/refs/heads/" ++ b) ref 
     liftIO $ C.writeFile (r ++ "/.hit/" ++ "HEAD") (C.pack ("refs/heads/" ++ b))
+
+  addBranch b = do
+  	r <- ask
+  	hr <- getHeadRef
+  	liftIO $ C.writeFile (r ++ "/.hit/refs/heads/" ++ b) hr
+  	return hr
 
   getHeadRef = do
     r <- ask
