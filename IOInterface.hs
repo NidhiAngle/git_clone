@@ -98,13 +98,6 @@ commitPrep refMap msg = do
   setHdres <- setHead "master" commitId
   return (refMap', commitId)
 
-runIOExceptT :: ExceptT String IO a -> [IO ()] -> (a -> IO ()) -> IO ()
-runIOExceptT m g f = do
-        result <- runExceptT m
-        case result of
-            Right a -> f a
-            Left e -> foldl (>>) (putStrLn e) g 
-
 getLog :: (RepoMonad m) => m (IO ())
 getLog = do 
   headRef <- getHeadRef
@@ -144,37 +137,45 @@ initRef = do
 
 
 userInterface :: IO ()
-userInterface = 
-  runIOExceptT (runReaderT (initRef :: RepoState OS.RefStore)  "./") [] go
+userInterface = do 
+  rs <- runExceptT $ runReaderT (initRef :: RepoState OS.RefStore)  "./"
+  case rs of
+    Right rs' -> go rs'
+    Left e     -> putStrLn e
   where
   go :: OS.RefStore -> IO()
-  go refMap = do
+  go rs = do
     liftIO $ Prelude.putStr "hit> "
     str <- liftIO  Prelude.getLine
     case str of
-      "init"   -> runIOExceptT
-                    (runReaderT (initialize refMap :: 
-                                  RepoState OS.RefStore) "./")
-                    [go refMap] 
-                    ((putStrLn "Initialized hit repo" >>) . go)
+      "init"   -> do
+                  init <- runExceptT $ runReaderT (initialize rs :: 
+                                                   RepoState OS.RefStore) "./"
+                  case init of 
+                    Right rs' -> putStrLn "Initialized hit repo" >> go rs'
+                    Left e -> putStrLn e >> go rs
       "commit" -> do
                   putStrLn "Please enter a commit message" 
                   msg    <- getLine 
-                  runIOExceptT 
-                    (runReaderT (commitPrep refMap msg :: 
-                                 RepoState (OS.RefStore, O.ObjectId)) "./")
-                    [go refMap] 
-                    (\(r,c) -> putStrLn ("Commit ID: " ++ C.unpack c) >> go r)
-      "log"    ->  runIOExceptT 
-                    (runReaderT (getLog :: RepoState (IO ())) "./") 
-                    [go refMap] 
-                    (>> go refMap)
+                  c <- runExceptT $ runReaderT (commitPrep rs msg ::
+                                     RepoState (OS.RefStore, O.ObjectId)) "./"
+                  case c of
+                    Right (refMap', c') -> 
+                        putStrLn ("Commit ID: " ++ C.unpack c') >> go refMap'
+                    Left e -> putStrLn e >> go rs
+      "log"    -> do 
+                  log <- runExceptT $ runReaderT (getLog :: 
+                                                  RepoState (IO ())) "./" 
+                  let msg = case log of 
+                              Right log' -> log'
+                              Left e -> putStrLn e
+                  msg >> go rs
       "branch" -> do
                   putStrLn "Enter branch name"
                   branchName <- getLine
-                  putStrLn "okay" >> go refMap
+                  putStrLn "okay" >> go rs
       "exit"   -> return ()
-      _        -> Prelude.putStrLn "Unrecognized command" >> go refMap
+      _        -> Prelude.putStrLn "Unrecognized command" >> go rs
 
 
   -- go refMap = do
