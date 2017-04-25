@@ -137,19 +137,16 @@ getCommitObject objId = do
     (O.CommitObj c) -> return $ Set.singleton c
     _ -> return Set.empty
 
-initRef :: OS.Repo -> IO OS.RefStore
-initRef repo = do
+initRef :: (RepoMonad m) => m OS.RefStore
+initRef = do
   let ref = OS.createRef
-  res <- runExceptT (RM.readRefs repo ref :: ExceptT String IO OS.RefStore)
-  case res of
-    Right r -> return r
-    Left _  -> return ref 
+  RM.readRefs ref
 
 
 userInterface :: IO ()
-userInterface = do
-  refMap <- (initRef "./")
-  go refMap where
+userInterface = 
+  runIOExceptT (runReaderT (initRef :: RepoState OS.RefStore)  "./") [] go
+  where
   go :: OS.RefStore -> IO()
   go refMap = do
     liftIO $ Prelude.putStr "hit> "

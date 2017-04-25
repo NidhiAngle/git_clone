@@ -85,15 +85,16 @@ instance RepoMonad (RepoState) where
 
   
   readRefs ref = do
-    r <- ask
-    exists   <- liftIO $ doesDirectoryExist (r ++ "/.hit/refs/heads")
+    r <- getRepo
+    exists <- liftIO $ doesDirectoryExist (r ++ "/.hit/refs/heads")
     if exists then do
-      branches <- liftIO $ listDirectory (repo ++ "/.hit/refs/heads")
+      branches <- liftIO $ listDirectory (r ++ "/.hit/refs/heads")
       addRefs branches ref
     else throwError $ "refs/heads does not exist, no new refs added to store"
     where
-        addRefs [] r     = return r
-        addRefs (b:bs) r = do
+        addRefs [] ref     = return ref
+        addRefs (b:bs) ref = do
+                           r <- getRepo
                            id <- liftIO $ C.readFile (r ++ "/.hit/refs/heads/" ++ b)
                            addRefs bs (OS.addRef ref (C.pack b) id)
   
