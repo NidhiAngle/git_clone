@@ -23,7 +23,7 @@ import Control.Monad ()
 import Control.Applicative ((<|>))
 import Data.Attoparsec.ByteString.Char8 as PB
 import Data.Map as Map
-
+import System.Directory (doesDirectoryExist)
 
 type RefStore  = Map C.ByteString O.ObjectId
 type Ref = O.ObjectId 

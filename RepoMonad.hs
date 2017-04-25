@@ -75,18 +75,17 @@ instance RepoMonad (ExceptT String IO) where
     else return (C.pack "")
     else throwError $ "HEAD file does not exist"
 
-   
-  
+ 
   readRefs repo ref = do
     exists   <- liftIO $ doesDirectoryExist (repo ++ "/.hit/refs/heads")
     if exists then do
       branches <- liftIO $ listDirectory (repo ++ "/.hit/refs/heads")
-      addRefs branches 
+      addRefs branches ref
     else throwError $ "refs/heads does not exist, no new refs added to store"
     where
-        addRefs []     = return ref
-        addRefs (b:bs) = do
+        addRefs [] ref     = return ref
+        addRefs (b:bs) ref = do
                            id <- liftIO $ C.readFile (repo ++ "/.hit/refs/heads/" ++ b)
-                           return $ OS.addRef ref (C.pack b) id
+                           addRefs bs (OS.addRef ref (C.pack b) id) 
   
   repomappend x y = mappend <$> x <*> y 
