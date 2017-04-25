@@ -137,8 +137,19 @@ getCommitObject objId = do
     (O.CommitObj c) -> return $ Set.singleton c
     _ -> return Set.empty
 
+initRef :: OS.Repo -> IO OS.RefStore
+initRef repo = do
+  let ref = OS.createRef
+  res <- runExceptT (RM.readRefs repo ref :: ExceptT String IO OS.RefStore)
+  case res of
+    Right r -> return r
+    Left _  -> return ref 
+
+
 userInterface :: IO ()
-userInterface = go OS.createRef where
+userInterface = do
+  refMap <- (initRef "./")
+  go refMap where
   go :: OS.RefStore -> IO()
   go refMap = do
     liftIO $ Prelude.putStr "hit> "
@@ -169,3 +180,21 @@ userInterface = go OS.createRef where
       _        -> Prelude.putStrLn "Unrecognized command" >> go refMap
 
 
+  -- go refMap = do
+  --    liftIO $ Prelude.putStr "hit> "
+  --    str <- liftIO $ Prelude.getLine
+  --    case str of
+  --      "init"   -> do
+  --                  r <- runExceptT (initialize "./" refMap) 
+  --                  case r of
+  --                    Left str      -> putStr str
+  --                    Right refMap  -> putStrLn ("Initialized hit repo") >> go refMap
+  --      "commit" -> do
+  --                  putStrLn ("Please enter a commit message")
+  --                  msg    <- Prelude.getLine 
+  --                  result <- runExceptT $ commitPrep refMap msg
+  --                  case result of
+  --                    Right (r,c) -> putStrLn ("Commit ID: " ++ (C.unpack c)) >> go r
+  --                    Left str    -> putStrLn str
+  --      "exit" -> return ()
+  --      _      -> Prelude.putStrLn "Unrecognized command" >> go refMap
