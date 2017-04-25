@@ -28,7 +28,8 @@ class (Monad m) => RepoMonad m where
    readRefs :: OS.RefStore -> m OS.RefStore
    repomappend :: (Monoid a) => m a -> m a -> m a
 
-type RepoState = ReaderT OS.Repo (ExceptT String IO)
+
+type RepoState = ReaderT OS.Repo (ExceptT String IO) 
 
 instance RepoMonad (RepoState) where
   readObjectFromFile id = do
