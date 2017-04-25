@@ -21,7 +21,7 @@ import Control.Monad.Trans.Reader
 import System.Directory (createDirectoryIfMissing, listDirectory,
                          doesDirectoryExist,doesFileExist)
 import System.FilePath (splitFileName)
-import RepoMonad
+
 type Author = C.ByteString
 type Message = C.ByteString
 

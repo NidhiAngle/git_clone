@@ -1,3 +1,7 @@
+
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 module Objects (
    Object(..)
   ,ObjectId
@@ -17,7 +21,11 @@ module Objects (
   ,bytestr
   ,makeBlobEntryType
   ,makeTreeEntryType
-
+  ,getTreeFromCommit
+  ,getEntries
+  ,getEType
+  ,getEId
+  ,getEName
 ) where 
 import qualified Data.ByteString.Char8 as C
 import qualified Data.Attoparsec.ByteString.Char8 as PB
@@ -38,6 +46,11 @@ data EntryType = TTree | TBlob deriving (Eq)
 instance Show EntryType where
   show TTree   = "tree"
   show TBlob   = "blob"
+
+instance Ord EntryType where
+  compare TTree TBlob = LT
+  compare TBlob TTree = GT
+  compare _ _         = EQ
 
 data Object = CommitObj Commit | TreeObj Tree | BlobObj Blob deriving (Eq, Show)
 
@@ -61,11 +74,22 @@ data Tree = Tree{
  name :: C.ByteString,
  entries  :: [TreeEntry] -- same object id but different file names?
                                                  -- to prevent commit in tree
-} deriving (Eq, Show)
+} deriving (Eq,Show)
+
 
 data Blob = Blob{
  content :: C.ByteString
 } deriving (Eq, Show)
+
+getTreeFromCommit :: Commit -> ObjectId
+getTreeFromCommit = tree 
+
+getEntries :: Tree -> [TreeEntry]
+getEntries = entries
+
+getEType (et,ei,en) = et
+getEId (et,ei,en)   = ei
+getEName (et,ei,en) = en
 
 makeCommit :: [ObjectId]-> ObjectId -> C.ByteString -> C.ByteString -> DT.UTCTime -> Object
 makeCommit ps n a m t= CommitObj $ Commit ps n a m t
