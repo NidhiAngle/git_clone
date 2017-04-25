@@ -3,6 +3,7 @@ module Objects (
   ,ObjectId
   ,ObjectName
   ,EntryType
+  ,TreeEntry
   ,Commit(parents, dateTime)
   ,makeCommit
   ,makeTree-- COMMENT OUT LATER
@@ -54,8 +55,10 @@ instance Eq Commit where
 instance Ord Commit where
   compare c1 c2 = compare (dateTime c2) (dateTime c1)
 
+type TreeEntry = (EntryType, ObjectId, ObjectName)
+
 data Tree = Tree{
- entries  :: [(EntryType, ObjectId, ObjectName)] -- same object id but different file names?
+ entries  :: [TreeEntry] -- same object id but different file names?
                                                  -- to prevent commit in tree
 } deriving (Eq, Show)
 
@@ -66,7 +69,7 @@ data Blob = Blob{
 makeCommit :: [ObjectId]-> ObjectId -> C.ByteString -> C.ByteString -> DT.UTCTime -> Object
 makeCommit ps n a m t= CommitObj $ Commit ps n a m t
 
-makeTree :: [(EntryType, ObjectId, ObjectName)] -> Object
+makeTree :: [TreeEntry] -> Object
 makeTree  = TreeObj . Tree
 
 makeBlob :: C.ByteString -> Object
