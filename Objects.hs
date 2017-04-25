@@ -22,6 +22,10 @@ module Objects (
   ,makeBlobEntryType
   ,makeTreeEntryType
   ,getTreeFromCommit
+  ,getEntries
+  ,getEType
+  ,getEId
+  ,getEName
 ) where 
 import qualified Data.ByteString.Char8 as C
 import qualified Data.Attoparsec.ByteString.Char8 as PB
@@ -44,8 +48,8 @@ instance Show EntryType where
   show TBlob   = "blob"
 
 instance Ord EntryType where
-  compare TTree TBlob = GT
-  compare TBlob TTree = LT
+  compare TTree TBlob = LT
+  compare TBlob TTree = GT
   compare _ _         = EQ
 
 data Object = CommitObj Commit | TreeObj Tree | BlobObj Blob deriving (Eq, Show)
