@@ -63,6 +63,8 @@ data Blob = Blob{
  content :: C.ByteString
 } deriving (Eq, Show)
 
+-- getTreeFromCommit :: Commit -> ObjectId
+
 makeCommit :: [ObjectId]-> ObjectId -> C.ByteString -> C.ByteString -> DT.UTCTime -> Object
 makeCommit ps n a m t= CommitObj $ Commit ps n a m t
 

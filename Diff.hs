@@ -1,24 +1,36 @@
+{-# LANGUAGE FlexibleInstances #-}
+module MyDiff where
+import Objects as O
 import Data.Algorithm.Diff
 import Data.Algorithm.DiffOutput
 import RepoMonad
 import System.Directory (listDirectory,doesFileExist)
 import System.FilePath
--- main = do
---     file1 <- readFile "file1.txt"
---     file2 <- readFile "file2.txt"
-
---     let
---         lines1 = lines file1
---         lines2 = lines file2
---    print $ getDiff lines1 lines2
---    print $ getGroupedDiff lines1 lines2
---    putStrLn $ ppDiff $ getGroupedDiff lines1 lines2
---    putStrLn $ show $ prettyDiffs $ diffToLineRanges $ getGroupedDiff lines1 lines2
+import Control.Monad
+import Control.Monad.Except
 
 
-class Diff a where
-    diff :: (RepoMonad b) => a -> a -> b()
+class MyDiff a where
+    diff :: (RepoMonad b, MonadIO b) => a -> a -> b String
 
-instance Diff FilePath where
+instance MyDiff [Char] where
+-- for Filepath
+    diff f1 f2 =  do
+        file1 <- liftIO $ readFile f1
+        file2 <- liftIO $ readFile f2
+        let
+          lines1 = lines file1
+          lines2 = lines file2
+        return $ ppDiff $ getGroupedDiff lines1 lines2
 
-	diff :: (RepoMonad m ) => FilePath -> FilePath -> m()
+
+instance MyDiff O.Object where
+
+    diff (BlobObj b1) (BlobObj b2) = do
+        let c1 = lines $ show $ toLineBlob b1
+        let c2 = lines $ show $ toLineBlob b2
+        return $ ppDiff $ getGroupedDiff c1 c2
+
+    diff (CommitObj c1) (CommitObj c2) = do
+        
+
