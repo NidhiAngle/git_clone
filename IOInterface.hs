@@ -172,8 +172,18 @@ userInterface = do
                   msg >> go rs
       "branch" -> do
                   putStrLn "Enter branch name"
-                  branchName <- getLine
-                  putStrLn "okay" >> go rs
+                  branch <- getLine
+                  let branchName = C.pack branch
+                  case OS.lookupRef branchName rs of
+                    Just _ -> putStrLn (branch ++ " already exists") >> go rs 
+                    Nothing -> do
+                      ab <- runExceptT $ runReaderT (RM.addBranch branch ::
+                                                     RepoState OS.Ref) "./"
+                      case ab of
+                        Right hr -> do 
+                          let rs' = OS.addRef rs branchName hr 
+                          putStrLn ("Successfully created " ++ branch) >> go rs'
+                        Left e  -> putStrLn e >> go rs
       "exit"   -> return ()
       _        -> Prelude.putStrLn "Unrecognized command" >> go rs
 
