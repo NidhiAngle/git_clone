@@ -1,10 +1,16 @@
+
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 module Objects (
    Object(..)
   ,ObjectId
   ,ObjectName
-  ,EntryType
+  ,EntryType(TTree, TBlob)
   ,TreeEntry
-  ,Commit(parents, dateTime)
+  ,Commit(parents, dateTime, tree)
+  ,Blob(content)
+  ,Tree(name, entries)
   ,makeCommit
   ,makeTree-- COMMENT OUT LATER
   ,makeBlob-- COMMENT OUT LATER
@@ -17,7 +23,11 @@ module Objects (
   ,bytestr
   ,makeBlobEntryType
   ,makeTreeEntryType
-
+  ,getTreeFromCommit
+  ,getEntries
+  ,getEType
+  ,getEId
+  ,getEName
 ) where 
 import qualified Data.ByteString.Char8 as C
 import qualified Data.Attoparsec.ByteString.Char8 as PB
@@ -39,6 +49,11 @@ instance Show EntryType where
   show TTree   = "tree"
   show TBlob   = "blob"
 
+instance Ord EntryType where
+  compare TTree TBlob = LT
+  compare TBlob TTree = GT
+  compare _ _         = EQ
+
 data Object = CommitObj Commit | TreeObj Tree | BlobObj Blob deriving (Eq, Show)
 
 data Commit = Commit {
@@ -58,19 +73,31 @@ instance Ord Commit where
 type TreeEntry = (EntryType, ObjectId, ObjectName)
 
 data Tree = Tree{
+ name :: C.ByteString,
  entries  :: [TreeEntry] -- same object id but different file names?
                                                  -- to prevent commit in tree
-} deriving (Eq, Show)
+} deriving (Eq,Show)
+
 
 data Blob = Blob{
  content :: C.ByteString
 } deriving (Eq, Show)
 
+getTreeFromCommit :: Commit -> ObjectId
+getTreeFromCommit = tree 
+
+getEntries :: Tree -> [TreeEntry]
+getEntries = entries
+
+getEType (et,ei,en) = et
+getEId (et,ei,en)   = ei
+getEName (et,ei,en) = en
+
 makeCommit :: [ObjectId]-> ObjectId -> C.ByteString -> C.ByteString -> DT.UTCTime -> Object
 makeCommit ps n a m t= CommitObj $ Commit ps n a m t
 
-makeTree :: [TreeEntry] -> Object
-makeTree  = TreeObj . Tree
+makeTree :: C.ByteString -> [TreeEntry] -> Object
+makeTree n es = TreeObj $ Tree n es
 
 makeBlob :: C.ByteString -> Object
 makeBlob = BlobObj . Blob
@@ -119,8 +146,10 @@ parseCommit = do
 
 parseTree :: PB.Parser Tree
 parseTree = do
+  name <- bytestr "name " *> PB.takeTill (== '\n')
+  nls
   entries <- PB.many' parseEntry
-  pure $ Tree entries
+  pure $ Tree name entries
 
 
 
@@ -145,7 +174,7 @@ toLineCommit c = Prelude.foldl (\b x -> b `C.append` helper "parent " x)
 -- pretty printer for tree objects, for example, to write to files
 -- put in object?
 toLineTree :: Tree -> C.ByteString 
-toLineTree t = Prelude.foldl helper (C.pack "") (entries t)
+toLineTree t = Prelude.foldl helper (C.pack "name " `C.append` (name t) `C.append` C.pack "\n") (entries t)
   where 
     helper base (x, id, name) = case x of
       TBlob -> base `C.append` C.pack "blob " `C.append` id `C.append` 
