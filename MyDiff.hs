@@ -17,7 +17,7 @@ import Data.List (sortBy)
 
 class MyDiff a where
     diff :: (RepoMonad b, MonadIO b) => a -> a -> b String
-
+    
 instance MyDiff [Char] where
 -- for Filepath
     diff f1 f2 =  do
@@ -36,9 +36,9 @@ instance MyDiff O.Object where
           (i1, c1) = OS.hashContent o1
           (i2, c2) = OS.hashContent o2
           intro    = "\nBlob 1:" ++ (chopId (C.unpack i1)) ++ "\n" ++
-                     "Blob 2:" ++ (chopId (C.unpack i2))
-      let c1 = lines $ show $ toLineBlob b1
-      let c2 = lines $ show $ toLineBlob b2
+                     "Blob 2:" ++ (chopId (C.unpack i2)) ++ "\n"
+      let c1 = Prelude.lines $ show $ toLineBlob b1
+      let c2 = Prelude.lines $ show $ toLineBlob b2
       return $ intro ++ (ppDiff $ getGroupedDiff c1 c2)
       
 
@@ -65,7 +65,7 @@ instance MyDiff O.Object where
     diff o1 o2 = do
       let (i1, c1) = OS.hashContent o1
           (i2, c2) = OS.hashContent o2
-      return $ "\nCannot compare obj "++C.unpack(i1)++","++C.unpack(i2)
+      return $ "\nCannot compare obj "++chopId (C.unpack(i1))++","++chopId(C.unpack(i2))
 
 -- -- -- Compares first on type then on file. Sort entries with all tree first
 instance MyDiff [TreeEntry] where
@@ -87,7 +87,7 @@ instance MyDiff [TreeEntry] where
 
    diff f [] = do
      Prelude.foldl x (return "") f where
-        x = (\b (f1,f2,f3) -> (++) <$> b <*> display "Second" f2 f3)
+        x = (\b (f1,f2,f3) -> (++) <$> b <*> display "First" f2 f3)
 
 
 instance MyDiff O.ObjectId where 

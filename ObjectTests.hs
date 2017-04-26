@@ -24,25 +24,29 @@ blob1 = makeBlob $ C.pack "Hi there everyone! Welcome to our git clone."
 
 commitStr = C.pack "commit 75\0parent PARENT1\nparent PARENT2\ntree TREE\nauthor AUTHOR\n\nMSG\ntime 1321727332\n"
 commitWOParentStr = C.pack "commit 45\0tree TREE\nauthor AUTHOR\n\nMSG\ntime 1321727332\n"
-treeStr   = C.pack "tree 48\0blob BLOB1 first\nblob BLOB2 sec\ntree TREE third\n"
-emptytreeStr = C.pack "tree 0\0"
+treeStr   = C.pack "tree 59\NULname tree1\nblob BLOB1 first\nblob BLOB2 sec\ntree TREE third\n"
+emptytreeStr = C.pack "tree 15\NULname emptyTree\n"
 blobStr   = C.pack "blob 44\0Hi there everyone! Welcome to our git clone."
 
-blob2 = makeBlob $ C.pack "LINE1\nLINE2"
-blob3 = makeBlob $ C.pack "LINE1\nLINE2"
-blob4 = makeBlob $ C.pack "LINE1\nLINECHANGED2"
+blob2 = makeBlob $ C.pack "LINE1"
+blob3 = makeBlob $ C.pack "LINE1"
+blob4 = makeBlob $ C.pack "LINECHANGED2"
 blob5 = makeBlob $ C.pack "LINE1"
-blob6 = makeBlob $ C.pack "LINE1\nLINE2\nLINE3"
+blob6 = makeBlob $ C.pack "LINE1\nLINE3"
 
 -- tree1 = makeTree $ [(O.makeTreeEntryType), ]
 -- exportObject :: Monad m => Repo -> O.Object -> (m FilePath,m FilePath, m C.ByteString)
 third :: (FilePath,O.ObjectId, C.ByteString) -> C.ByteString
 third (a,b,c) = c
 
+--beforeTests 
 beforeTests = do
-  -- RM.writeObjectToFile (BlobObj blob2)
+  _ <- runExceptT (runReaderT (RM.writeObjectToFile blob2 :: RepoState O.ObjectId) "./")
+  _ <- runExceptT (runReaderT (RM.writeObjectToFile blob4 :: RepoState O.ObjectId) "./")
+  return ()
+
+finalTest = do
   -- RM.writeObjectToFile (BlobObj blob3)
-  -- RM.writeObjectToFile (BlobObj blob4)
   -- RM.writeObjectToFile (BlobObj blob5)
   -- RM.writeObjectToFile (BlobObj blob6)
   let 
@@ -67,9 +71,24 @@ beforeTests = do
                          (O.makeTreeEntryType, t4, C.pack "tree2"),
                          (O.makeTreeEntryType, t2, C.pack "treex")]
 --  return ()
-    x = (~?=) <$> (getDiff (diff blob2 blob3)) <*> return "\nBlob 1:be2fe\nBlob 2:be2fe\n"
-  _ <- (x >>= runTestTT)
+    x = [(~?=) <$> (getDiff (diff blob2 blob3)) <*> return s1,
+         (~?=) <$> (getDiff (diff blob2 blob4)) <*> return s2,
+         (~?=) <$> (getDiff (diff blob2 blob5)) <*> return s3,
+         (~?=) <$> (getDiff (diff blob2 blob6)) <*> return s4,
+         (~?=) <$> (getDiff (diff blob2 tree2)) <*> return s5,
+         (~?=) <$> (getDiff (diff tree2 tree3)) <*> return s6,
+         (~?=) <$> (getDiff (diff tree2 tree4)) <*> return s7]
+  _ <- ((sequence x) >>= (\x -> runTestTT (TestList x)))
+  _ <- runTestTT (TestList [importObjectTests, exportObjectTests])
   return ()
+
+s1 = "\nBlob 1:94323\nBlob 2:94323\n\n"
+s2 = "\nBlob 1:94323\nBlob 2:47964\n1c1\n< \"LINE1\"\n---\n> \"LINECHANGED2\"\n"
+s3 = "\nBlob 1:94323\nBlob 2:94323\n\n"
+s4 = "\nBlob 1:94323\nBlob 2:f58f8\n1c1\n< \"LINE1\"\n---\n> \"LINE1\\nLINE3\"\n"
+s5 = "\nCannot compare obj 94323,5d88a"
+s6 = "\nTree 1:5d88a\nTree 2:9f892\n\n~~New file in Second: alsoblob2\n\"LINE1\"\n~~New file in First: blob2\n\"LINE1\"" 
+s7 = "\nTree 1:5d88a\nTree 2:e5395\n\nBlob 1:94323\nBlob 2:47964\n1c1\n< \"LINE1\"\n---\n> \"LINECHANGED2\"\n"
 
 
 getDiff :: RepoState String -> IO String
