@@ -13,7 +13,6 @@ import qualified Data.ByteString.Char8 as C
 import RepoMonad as RM  
 import Data.List (sortBy)
 
-import Control.Monad.Trans.Reader
 
 
 class MyDiff a where
@@ -36,8 +35,8 @@ instance MyDiff O.Object where
       let 
           (i1, c1) = OS.hashContent o1
           (i2, c2) = OS.hashContent o2
-          intro    = "\nBlob 1:" ++ (C.unpack i1) ++ "\n" ++
-                     "Blob 2:" ++ (C.unpack i2)
+          intro    = "\nBlob 1:" ++ (chopId (C.unpack i1)) ++ "\n" ++
+                     "Blob 2:" ++ (chopId (C.unpack i2))
       let c1 = lines $ show $ toLineBlob b1
       let c2 = lines $ show $ toLineBlob b2
       return $ intro ++ (ppDiff $ getGroupedDiff c1 c2)
@@ -47,8 +46,8 @@ instance MyDiff O.Object where
       let 
         (i1, c1) = OS.hashContent o1
         (i2, c2) = OS.hashContent o2
-        intro    = "\nTree 1:" ++ (C.unpack i1) ++ "\n" ++
-                   "Tree 2:" ++ (C.unpack i2) ++ "\n" 
+        intro    = "\nTree 1:" ++ (chopId (C.unpack i1)) ++ "\n" ++
+                   "Tree 2:" ++ (chopId (C.unpack i2)) ++ "\n" 
         e1s = sortBy sorter (O.getEntries t1) 
         e2s = sortBy sorter (O.getEntries t2)
       ((++) intro) <$> diff e1s e2s
@@ -59,8 +58,8 @@ instance MyDiff O.Object where
       let 
         (i1, x) = OS.hashContent o1
         (i2, y) = OS.hashContent o2
-        intro    = "\nCommit 1:" ++ (C.unpack i1) ++ "\n" ++
-                   "\nCommit 2:" ++ (C.unpack i2) ++ "\n" 
+        intro    = "\nCommit 1:" ++ (chopId (C.unpack i1)) ++ "\n" ++
+                   "\nCommit 2:" ++ (chopId (C.unpack i2)) ++ "\n" 
       ((++) intro) <$> diff (getTreeFromCommit c1) (getTreeFromCommit c2)
 
     diff o1 o2 = do
@@ -81,7 +80,14 @@ instance MyDiff [TreeEntry] where
         (++) <$> display "First" e2 e3 <*> diff es f
               else -- First is a blob, second is a tree
         (++) <$> display "Second" f2 f3 <*> diff e fs
+   
+   diff [] f = do
+     Prelude.foldl x (return "") f where
+        x = (\b (f1,f2,f3) -> (++) <$> b <*> display "Second" f2 f3)
 
+   diff f [] = do
+     Prelude.foldl x (return "") f where
+        x = (\b (f1,f2,f3) -> (++) <$> b <*> display "Second" f2 f3)
 
 
 instance MyDiff O.ObjectId where 
@@ -103,4 +109,5 @@ display str id name = do
              (show (toLineBlob blob))
     (CommitObj commit) -> do
       return "\nWhy is a commit a tree entry?"
-    
+
+chopId (a:(b:(c:(d:(e:es))))) = a:(b:(c:(d:[e])))    
