@@ -18,6 +18,7 @@ import Control.Monad.Trans.Reader
 import System.Directory (createDirectoryIfMissing, listDirectory,
                          doesDirectoryExist,doesFileExist)
 import System.FilePath (splitFileName)
+import MyDiff as D
 
 type Author = C.ByteString
 type Message = C.ByteString
@@ -159,7 +160,25 @@ userInterface = do
                              else putStrLn ("Some local files would be overwritten" ++
                                            " in checkout. Please commit first") >> go rs
                            Left e -> putStrLn e >> go rs
-                      Nothing -> putStrLn ("branch " ++ branch ++ " does not exist") >> go rs 
-      "exit"   -> return ()
-      _        -> Prelude.putStrLn "Unrecognized command" >> go rs
+                      Nothing -> putStrLn ("branch " ++ branch ++ " does not exist") >> go rs
+      "diff -o"  -> do
+                    putStr "Enter first objectId: " 
+                    f1 <- getLine
+                    putStr "Enter second objectId: "
+                    f2 <- getLine
+                    res <- runExceptT (runReaderT (D.diff (C.pack f1) (C.pack f2)) "./test")
+                    case res of
+                      Right str -> putStrLn str >> go rs
+                      Left  str -> putStrLn str >> go rs 
+      "diff -f"  -> do
+                    putStr "Enter first file: " 
+                    f1 <- getLine
+                    putStr "Enter second file: "
+                    f2 <- getLine
+                    res <- runExceptT (runReaderT (D.diff f1 f2) "./test")
+                    case res of
+                      Right str -> putStrLn str >> go rs
+                      Left  str -> putStrLn str >> go rs 
+      "exit"     -> return ()
+      _          -> Prelude.putStrLn "Unrecognized command" >> go rs
 
