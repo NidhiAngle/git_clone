@@ -131,9 +131,8 @@ instance RepoMonad (RepoState) where
 
     where
       deleteFp :: FilePath -> IO () -> IO ()
-      deleteFp fp acc = do
-                        let dir = takeDirectory fp
-                        if any (isSuffixOf  dir) [".hit",".git"] then
+      deleteFp fp acc = 
+                        if any (isSuffixOf  fp) [".hit",".git", ".gitignore"] then
                           acc
                         else do
                         isDirectory <- liftIO $ doesDirectoryExist fp 
