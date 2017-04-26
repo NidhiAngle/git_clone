@@ -62,8 +62,8 @@ getLog = do
     _               -> return $ putStrLn $ "Not a commit object" ++ 
                                             C.unpack headRef
   where
-  printLogs logSet = mapM_ (print . show) (Set.toList logSet)
-  
+  printLogs logSet = mapM_ func (Set.toList logSet)
+  func = (\x -> putStrLn (C.unpack (O.toLineCommit x) ++ "\n~~~~"))
 
 getCommitParent ::  (RepoMonad m) => O.Commit -> m (Set O.Commit)
 getCommitParent x = 

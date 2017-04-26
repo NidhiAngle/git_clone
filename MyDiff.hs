@@ -21,12 +21,16 @@ class MyDiff a where
 instance MyDiff [Char] where
 -- for Filepath
     diff f1 f2 =  do
-      file1 <- liftIO $ readFile f1
-      file2 <- liftIO $ readFile f2
-      let
-        lines1 = lines file1
-        lines2 = lines file2
-      return $ ppDiff $ getGroupedDiff lines1 lines2
+      exists1 <- liftIO $ doesFileExist f1
+      exists2 <- liftIO $ doesFileExist f2
+      if (exists1 && exists2) then do
+        file1 <- liftIO $ readFile f1
+        file2 <- liftIO $ readFile f2
+        let
+          lines1 = lines file1
+          lines2 = lines file2
+        return $ ppDiff $ getGroupedDiff lines1 lines2
+      else return $ "File does not exist"
       
 
 instance MyDiff O.Object where
