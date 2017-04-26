@@ -36,7 +36,7 @@ instance MyDiff O.Object where
           (i1, c1) = OS.hashContent o1
           (i2, c2) = OS.hashContent o2
           intro    = "\nBlob 1:" ++ (chopId (C.unpack i1)) ++ "\n" ++
-                     "Blob 2:" ++ (chopId (C.unpack i2)) ++ "\n"
+                       "Blob 2:" ++ (chopId (C.unpack i2)) ++ "\n"
       let c1 = Prelude.lines $ show $ toLineBlob b1
       let c2 = Prelude.lines $ show $ toLineBlob b2
       return $ intro ++ (ppDiff $ getGroupedDiff c1 c2)
@@ -47,7 +47,7 @@ instance MyDiff O.Object where
         (i1, c1) = OS.hashContent o1
         (i2, c2) = OS.hashContent o2
         intro    = "\nTree 1:" ++ (chopId (C.unpack i1)) ++ "\n" ++
-                   "Tree 2:" ++ (chopId (C.unpack i2)) ++ "\n" 
+                     "Tree 2:" ++ (chopId (C.unpack i2)) ++ "\n" 
         e1s = sortBy sorter (O.getEntries t1) 
         e2s = sortBy sorter (O.getEntries t2)
       ((++) intro) <$> diff e1s e2s
@@ -75,7 +75,8 @@ instance MyDiff [TreeEntry] where
         ((++) ("\nNo change in "++C.unpack(e3)++","++C.unpack(f3)))
         <$> diff es fs
       else if (e1 == f1 && e3 == f3) then
-        (++) <$> diff e2 f2 <*> diff es fs
+        let str = ((++) ("\n~~Changes in " ++ C.unpack e3 ++","++ C.unpack f3++"\n")) <$> diff e2 f2 in
+        (++) <$> str <*> diff es fs
       else if (e < f) then
         (++) <$> display "First" e2 e3 <*> diff es f
               else -- First is a blob, second is a tree

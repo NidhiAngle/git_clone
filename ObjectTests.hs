@@ -39,16 +39,12 @@ blob6 = makeBlob $ C.pack "LINE1\nLINE3"
 third :: (FilePath,O.ObjectId, C.ByteString) -> C.ByteString
 third (a,b,c) = c
 
---beforeTests 
-beforeTests = do
-  _ <- runExceptT (runReaderT (RM.writeObjectToFile blob2 :: RepoState O.ObjectId) "./")
-  _ <- runExceptT (runReaderT (RM.writeObjectToFile blob4 :: RepoState O.ObjectId) "./")
-  return ()
+--beforeTests
 
 finalTest = do
-  -- RM.writeObjectToFile (BlobObj blob3)
-  -- RM.writeObjectToFile (BlobObj blob5)
-  -- RM.writeObjectToFile (BlobObj blob6)
+  _ <- runExceptT (runReaderT (RM.writeObjectToFile blob2 :: RepoState O.ObjectId) "./test/")
+  _ <- runExceptT (runReaderT (RM.writeObjectToFile blob4 :: RepoState O.ObjectId) "./test/")
+  
   let 
     (i2,a) = OS.hashContent blob2
     (i3,b) = OS.hashContent blob3
@@ -70,14 +66,21 @@ finalTest = do
                          (O.makeBlobEntryType, i4, C.pack "blob4"),
                          (O.makeTreeEntryType, t4, C.pack "tree2"),
                          (O.makeTreeEntryType, t2, C.pack "treex")]
---  return ()
+  
     x = [(~?=) <$> (getDiff (diff blob2 blob3)) <*> return s1,
          (~?=) <$> (getDiff (diff blob2 blob4)) <*> return s2,
          (~?=) <$> (getDiff (diff blob2 blob5)) <*> return s3,
          (~?=) <$> (getDiff (diff blob2 blob6)) <*> return s4,
          (~?=) <$> (getDiff (diff blob2 tree2)) <*> return s5,
          (~?=) <$> (getDiff (diff tree2 tree3)) <*> return s6,
-         (~?=) <$> (getDiff (diff tree2 tree4)) <*> return s7]
+         (~?=) <$> (getDiff (diff tree2 tree4)) <*> return s7,
+         (~?=) <$> (getDiff (diff tree5 tree6)) <*> return s8,
+         (~?=) <$> (getDiff (diff tree5 tree2)) <*> return s9,
+         (~?=) <$> (getDiff (diff tree5 tree4)) <*> return s0]
+  _ <- runExceptT (runReaderT (RM.writeObjectToFile tree2 
+                                 :: RepoState O.ObjectId) "./test/")
+  _ <- runExceptT (runReaderT (RM.writeObjectToFile tree4 
+                                 :: RepoState O.ObjectId) "./test/")
   _ <- ((sequence x) >>= (\x -> runTestTT (TestList x)))
   _ <- runTestTT (TestList [importObjectTests, exportObjectTests])
   return ()
@@ -88,12 +91,14 @@ s3 = "\nBlob 1:94323\nBlob 2:94323\n\n"
 s4 = "\nBlob 1:94323\nBlob 2:f58f8\n1c1\n< \"LINE1\"\n---\n> \"LINE1\\nLINE3\"\n"
 s5 = "\nCannot compare obj 94323,5d88a"
 s6 = "\nTree 1:5d88a\nTree 2:9f892\n\n~~New file in Second: alsoblob2\n\"LINE1\"\n~~New file in First: blob2\n\"LINE1\"" 
-s7 = "\nTree 1:5d88a\nTree 2:e5395\n\nBlob 1:94323\nBlob 2:47964\n1c1\n< \"LINE1\"\n---\n> \"LINECHANGED2\"\n"
-
+s7 = "\nTree 1:5d88a\nTree 2:e5395\n\n~~Changes in blob2,blob2\n\nBlob 1:94323\nBlob 2:47964\n1c1\n< \"LINE1\"\n---\n> \"LINECHANGED2\"\n"
+s8 = "\nTree 1:50f83\nTree 2:ecf3b\n\n~~Changes in tree2,tree2\n\nTree 1:5d88a\nTree 2:e5395\n\n~~Changes in blob2,blob2\n\nBlob 1:94323\nBlob 2:47964\n1c1\n< \"LINE1\"\n---\n> \"LINECHANGED2\"\n\n~~New folder in Second: treex\n\"name tree2\\nblob 9432366705517808d910ab80041213d86d451913bcb995b0d6d80eb93d66ac59 blob2\\n\"\n~~Changes in blob2,blob2\n\nBlob 1:94323\nBlob 2:94323\n\n\n~~New file in Second: blob3\n\"LINE1\"\n~~Changes in blob4,blob4\n\nBlob 1:94323\nBlob 2:47964\n1c1\n< \"LINE1\"\n---\n> \"LINECHANGED2\"\n\n~~New file in First: blob5\n\"LINE1\""
+s9 = "\nTree 1:50f83\nTree 2:5d88a\n\n~~New folder in First: tree2\n\"name tree2\\nblob 9432366705517808d910ab80041213d86d451913bcb995b0d6d80eb93d66ac59 blob2\\n\"\n~~Changes in blob2,blob2\n\nBlob 1:94323\nBlob 2:94323\n\n\n~~New file in First: blob4\n\"LINE1\"\n~~New file in First: blob5\n\"LINE1\""
+s0 = "\nTree 1:50f83\nTree 2:e5395\n\n~~New folder in First: tree2\n\"name tree2\\nblob 9432366705517808d910ab80041213d86d451913bcb995b0d6d80eb93d66ac59 blob2\\n\"\n~~Changes in blob2,blob2\n\nBlob 1:94323\nBlob 2:47964\n1c1\n< \"LINE1\"\n---\n> \"LINECHANGED2\"\n\n~~New file in First: blob4\n\"LINE1\"\n~~New file in First: blob5\n\"LINE1\""
 
 getDiff :: RepoState String -> IO String
 getDiff x = do
-  res <- runExceptT (runReaderT x "./") 
+  res <- runExceptT (runReaderT x "./test") 
   case res of
     Right s -> return s
     Left  s -> return s
