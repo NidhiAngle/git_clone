@@ -43,6 +43,16 @@ commitPrep f refMap msg = do
 --  return (refMap' , commitId)
   return (OS.addRef refMap' bname commitId, commitId)
 
+mprep b2 rs= do
+  path <- RM.getHeadRef
+  let b1 = takeFileName (C.unpack path)
+  case (OS.lookupRef (C.pack b1) rs, OS.lookupRef (C.pack b2) rs) of
+    (Just i1, Just i2) -> do 
+          i3 <- M.merger i1 i2
+          _  <- RM.updateBranchRef b1 i3
+          _  <- RM.switchToBranch b1
+          return ()
+    (_,_)  -> throwError "Couldnt find the branch id!"
 
 initRef :: OS.Repo -> IO OS.RefStore
 initRef repo = do
@@ -70,16 +80,21 @@ userInterface repo = do
     str <- liftIO  Prelude.getLine
     case str of
       "init"   -> do
-                  init <- runExceptT $ runReaderT (initialize rs :: 
-                                                   RM.RepoState OS.RefStore) repo
+                  init <- runExceptT $ 
+                            runReaderT 
+                              (initialize rs :: RM.RepoState OS.RefStore) 
+                              repo
                   case init of 
                     Right rs' -> putStrLn "Initialized hit repo" >> go rs'
                     Left e -> putStrLn e >> go rs
       "commit" -> do
                   putStr "Please enter a commit message: " 
                   msg    <- getLine 
-                  c <- runExceptT $ runReaderT (commitPrep RM.writeObjectToFile rs msg ::
-                                     RM.RepoState (OS.RefStore, O.ObjectId)) repo
+                  c <- runExceptT $ 
+                         runReaderT 
+                           (commitPrep RM.writeObjectToFile rs msg ::
+                             RM.RepoState (OS.RefStore, O.ObjectId)) 
+                           repo
                   case c of
                     Right (refMap', c') -> 
                         putStrLn ("Commit ID: " ++ C.unpack c') >> go refMap'
@@ -109,26 +124,32 @@ userInterface repo = do
                     let branchName = C.pack branch
                     case OS.lookupRef branchName rs of
                       Just id -> do
-                         b <- runExceptT $ runReaderT (RM.isWorkingDirectoryDirty ::
-                                                      RM.RepoState Bool) repo
+                         b <- runExceptT $ runReaderT 
+                                             (RM.isWorkingDirectoryDirty ::
+                                              RM.RepoState Bool) repo
                          case b of 
                            Right dirty ->
                              if not dirty then do
-                               co <- runExceptT $ runReaderT (RM.switchToBranch branch :: 
-                                                             RM.RepoState ()) repo
+                               co <- runExceptT $ runReaderT 
+                                                    (RM.switchToBranch branch :: 
+                                                     RM.RepoState ()) repo
                                case co of 
                                  Right _ -> go rs
                                  Left e -> putStrLn e >> go rs  
-                             else putStrLn ("Some local files would be overwritten" ++
-                                           " in checkout. Please commit first") >> go rs
+                             else putStrLn 
+                                  ("Some local files would be overwritten" ++
+                                   " in checkout. Please commit first") >> go rs
                            Left e -> putStrLn e >> go rs
-                      Nothing -> putStrLn ("branch " ++ branch ++ " does not exist") >> go rs 
+                      Nothing -> putStrLn 
+                                 ("branch " ++ branch ++ " does not exist") 
+                                 >> go rs 
       "diff -o"  -> do
                     putStr "Enter first objectId: " 
                     f1 <- getLine
                     putStr "Enter second objectId: "
                     f2 <- getLine
-                    res <- runExceptT (runReaderT (D.diff (C.pack f1) (C.pack f2)) repo)
+                    res <- runExceptT $
+                             runReaderT (D.diff (C.pack f1) (C.pack f2)) repo
                     case res of
                       Right str -> putStrLn str >> go rs
                       Left  str -> putStrLn str >> go rs 
@@ -137,7 +158,7 @@ userInterface repo = do
                     f1 <- getLine
                     putStr "Enter second file: "
                     f2 <- getLine
-                    res <- runExceptT (runReaderT (D.diff f1 f2) repo)
+                    res <- runExceptT $ runReaderT (D.diff f1 f2) repo
                     case res of
                       Right str -> putStrLn str >> go rs
                       Left  str -> putStrLn str >> go rs
@@ -148,18 +169,7 @@ userInterface repo = do
                     case r1 of
                       Right _ -> go rs
                       Left str -> putStrLn str >> go rs 
-      "exit"     -> (putStrLn . show) rs >> return ()
-      "ref"      -> (putStrLn . show) rs >> go rs
+      "exit"     -> void (print rs)
+      "ref"      -> print rs >> go rs
       _          -> Prelude.putStrLn "Unrecognized command" >> go rs
 
-
-mprep b2 rs= do
-  path <- RM.getHeadRef
-  let b1 = takeFileName (C.unpack path)
-  case (OS.lookupRef (C.pack b1) rs, OS.lookupRef (C.pack b2) rs) of
-    (Just i1, Just i2) -> do 
-          i3 <- (M.merger i1 i2)
-          _  <- RM.updateBranchRef b1 i3
-          _  <- RM.switchToBranch b1
-          return ()
-    (_,_)  -> throwError $ "Couldnt find the branch id!"

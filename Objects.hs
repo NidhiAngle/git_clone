@@ -106,7 +106,8 @@ getTreeName = name
 -- getEId (et,ei,en)   = ei
 -- getEName (et,ei,en) = en
 
-makeCommit :: [ObjectId]-> ObjectId -> C.ByteString -> C.ByteString -> DT.UTCTime -> Object
+makeCommit :: [ObjectId]-> ObjectId -> C.ByteString -> C.ByteString -> 
+              DT.UTCTime -> Object
 makeCommit ps n a m t= CommitObj $ Commit ps n a m t
 
 makeTree :: C.ByteString -> [TreeEntry] -> Object
@@ -154,7 +155,8 @@ parseCommit = do
   nls
   time    <- bytestr "time " *> PB.takeTill (== '\n')
   nls
-  let dateTime = DTF.parseTimeOrError True DTF.defaultTimeLocale "%s" (C.unpack time)
+  let dateTime = 
+          DTF.parseTimeOrError True DTF.defaultTimeLocale "%s" (C.unpack time)
   pure $ Commit parents tree author msg dateTime
 
 parseTree :: PB.Parser Tree
@@ -179,7 +181,9 @@ toLineCommit c = Prelude.foldl (\b x -> b `C.append` helper "parent " x)
                  `C.append` helper "tree " (tree c) 
                  `C.append` helper "author " (author c)
                  `C.append` helper "msg" (message c)
-                 `C.append` helper "time " (C.pack (DTF.formatTime DTF.defaultTimeLocale "%s" (dateTime c)))
+                 `C.append` helper "time " (C.pack (DTF.formatTime 
+                                                      DTF.defaultTimeLocale 
+                                                      "%s" (dateTime c)))
   where
     helper "msg" x    = C.pack "\n" `C.append` x `C.append` C.pack "\n"
     helper str x   = C.pack str `C.append` x `C.append` C.pack "\n"
@@ -187,7 +191,9 @@ toLineCommit c = Prelude.foldl (\b x -> b `C.append` helper "parent " x)
 -- pretty printer for tree objects, for example, to write to files
 -- put in object?
 toLineTree :: Tree -> C.ByteString 
-toLineTree t = Prelude.foldl helper (C.pack "name " `C.append` (name t) `C.append` C.pack "\n") (entries t)
+toLineTree t = Prelude.foldl helper 
+                (C.pack "name " `C.append` name t `C.append` C.pack "\n") 
+                (entries t)
   where 
     helper base (x, id, name) = case x of
       TBlob -> base `C.append` C.pack "blob " `C.append` id `C.append` 

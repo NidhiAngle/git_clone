@@ -4,7 +4,6 @@
 
 module RepoMonad where
 
-import qualified Objects as O
 import qualified Codec.Compression.Zlib as Zlib
 import qualified Data.ByteString.Lazy as B
 import qualified ObjectStore as OS
@@ -12,8 +11,6 @@ import qualified Data.ByteString.Char8 as C
 import Control.Monad 
 import Control.Monad.Except
 import Data.Monoid
-import System.Directory (createDirectoryIfMissing, listDirectory,
-                         doesDirectoryExist,doesFileExist, removeDirectoryRecursive, removeFile)
 import System.FilePath (takeDirectory, splitFileName)
 import Data.Functor.Classes
 import Control.Monad.Trans.Reader
@@ -23,6 +20,13 @@ import Data.List (isSuffixOf, isPrefixOf)
 import qualified Data.Set as Set
 import Data.Set (Set)
 import qualified GitRevisions as GR
+import System.Directory (
+        createDirectoryIfMissing, 
+        listDirectory,
+        doesDirectoryExist,
+        doesFileExist, 
+        removeDirectoryRecursive, 
+        removeFile)
 
 type Author = C.ByteString
 type Message = C.ByteString
@@ -40,7 +44,8 @@ class (Monad m) => RepoMonad m where
    workingDirectoryId :: (O.Object -> m O.ObjectId) -> m O.ObjectId
    isWorkingDirectoryDirty :: m Bool
    switchToBranch :: OS.Branch -> m ()
-   commit :: (O.Object -> m O.ObjectId) -> [OS.Ref] -> Author -> Message -> m O.ObjectId
+   commit :: (O.Object -> m O.ObjectId) -> [OS.Ref] -> 
+             Author -> Message -> m O.ObjectId
    extractTreeToDisk :: O.ObjectId -> m ()
    repomappend :: (Monoid a) => m a -> m a -> m a
    getLog :: m (IO ()) 
@@ -48,7 +53,7 @@ class (Monad m) => RepoMonad m where
 
 type RepoState = ReaderT OS.Repo (ExceptT String IO) 
 
-instance RepoMonad (RepoState) where
+instance RepoMonad RepoState where
   readObjectFromFile id = do
     r <- getRepo
     let filename = OS.getObjPath r id 
@@ -57,7 +62,7 @@ instance RepoMonad (RepoState) where
       bs <- liftIO $ C.readFile filename
       case OS.readObject (inflate bs) of
         Just x  -> return x
-        Nothing -> throwError $ "This object is not valid"
+        Nothing -> throwError "This object is not valid"
     else throwError $ "This file does not exist: " ++ filename
     where inflate blob = C.concat . 
                          B.toChunks . 
@@ -84,14 +89,16 @@ instance RepoMonad (RepoState) where
     cId <- liftIO $ C.readFile (C.unpack headRef)
     headCommit <- readObjectFromFile cId
     case headCommit of
-      (O.CommitObj c) -> do
-                         commitLog <- GR.revParseTree [GR.RevId c] getCommitParent 
-                         return $ printLogs commitLog 
-      _               -> return $ putStrLn $ "Not a commit object" ++ 
-                                              C.unpack headRef
+      (O.CommitObj c) -> 
+        do
+        commitLog <- GR.revParseTree [GR.RevId c] getCommitParent 
+        return $ printLogs commitLog 
+      _               -> 
+        return $ putStrLn $ "Not a commit object" ++ C.unpack headRef
     where
-    printLogs logSet = mapM_ func (Set.toList logSet)
-    func = (\x -> putStrLn (C.unpack (O.toLineCommit x) ++ "\n~~~~"))
+    printLogs logSet = mapM_ sepCommit (Set.toList logSet)
+    sepCommit x = putStrLn (C.unpack (O.toLineCommit x) ++ "\n" ++ 
+                            replicate 80 '~') 
 
   initialize ref = do
       r <- getRepo
@@ -118,7 +125,7 @@ instance RepoMonad (RepoState) where
     let tree = O.makeTree (C.pack r) treeEntries
     f tree where
       traverseDirectories f fp = do
-          filePaths <- liftIO $ fmap (fmap ((++) (fp++"/"))) $ listDirectory fp
+          filePaths <- liftIO $ fmap ((fp++"/")++) <$> listDirectory fp
           foldr examine (return []) filePaths where
           examine dir = liftM2 mappend (examineEachDirectory f dir) 
           examineEachDirectory f filepath = do
@@ -127,7 +134,8 @@ instance RepoMonad (RepoState) where
                 Just x  -> return [x]
                 Nothing -> return []
       examineDirectory f filePath = 
-        if foldr (\test bool -> isSuffixOf test filePath || bool) False [".hit",".git", ".gitignore", ".DS_Store"] then
+        if foldr (\test bool -> isSuffixOf test filePath || bool) 
+                  False ignorePaths then
            return Nothing
         else do
         isDirectory <- liftIO $ doesDirectoryExist filePath
@@ -144,6 +152,7 @@ instance RepoMonad (RepoState) where
                fileName <- f blob
                return $ Just (O.makeBlobEntryType, fileName, C.pack filePath)
           (_,_)  ->  return Nothing 
+      ignorePaths = [".hit",".git", ".gitignore", ".DS_Store"] 
 
   commit f refs a m = do
     filename <- workingDirectoryId f
@@ -152,10 +161,10 @@ instance RepoMonad (RepoState) where
     let c     = O.makeCommit (Set.toList (Set.fromList cIds)) filename a m utc
     f c 
     where
-      getCommitIds refs = do
-       fmap (filter (\x -> 0 < C.length x)) $ sequence (fmap tryToRead refs)
+      getCommitIds refs = 
+       filter (\x -> 0 < C.length x) <$> sequence (fmap tryToRead refs)
       tryToRead ref = do
-        let ref' = (C.unpack ref)
+        let ref' = C.unpack ref 
         fileExists <- doesFileExist ref'
         if fileExists then
           C.readFile ref'
@@ -169,33 +178,37 @@ instance RepoMonad (RepoState) where
     ref <- liftIO $ C.readFile branchPath
     setHead branch ref
     filePaths <- liftIO $ fmap (fmap (r ++)) (listDirectory r)
-    liftIO $ ((foldr deleteFp (return ()) filePaths) >> putStrLn (C.unpack ref))
+    liftIO (foldr deleteFp (return ()) filePaths >> putStrLn (C.unpack ref))
     ro <- readObjectFromFile ref
     case ro of 
           (O.CommitObj c) -> extractTreeToDisk (O.tree c)  
-          (O.TreeObj t) -> throwError $ "Read tree object " ++ show t ++ " instead of commit"
-          (O.BlobObj b) -> throwError $ "Read blob object " ++ show b ++ " instead of commit"
+          (O.TreeObj t) -> throwError $ "Read tree object " ++ show t ++ 
+                                        " instead of commit"
+          (O.BlobObj b) -> throwError $ "Read blob object " ++ show b ++ 
+                                        " instead of commit"
 
     where
       deleteFp :: FilePath -> IO () -> IO ()
       deleteFp fp acc = 
-                        if foldr (\test bool -> isSuffixOf test fp || bool) False [".hit",".git", ".gitignore"] then
-                          acc
-                        else do
-                        isDirectory <- liftIO $ doesDirectoryExist fp 
-                        if isDirectory then 
-                           removeDirectoryRecursive fp >> acc
-                        else removeFile fp >> acc
+        if foldr (isInvalidPath fp) False [".hit",".git", ".gitignore"] then
+        acc
+        else do
+        isDirectory <- liftIO $ doesDirectoryExist fp 
+        if isDirectory then 
+           removeDirectoryRecursive fp >> acc
+        else removeFile fp >> acc
+      isInvalidPath fp test bool = isSuffixOf test fp || bool
 
 
   extractTreeToDisk treeId  = do
     ro <- readObjectFromFile treeId
     case ro of
-         (O.TreeObj t) -> do
-                          liftIO $ createDirectoryIfMissing True ((C.unpack . O.name) t)
-                          handleEntries (O.entries t) 
-         (O.CommitObj c) -> throwError "Expecting tree, but received commit"
-         (O.BlobObj b) -> throwError "Expecting tree, but received blob"
+       (O.TreeObj t) -> 
+         do
+         liftIO $ createDirectoryIfMissing True ((C.unpack . O.name) t)
+         handleEntries (O.entries t) 
+       (O.CommitObj c) -> throwError "Expecting tree, but received commit"
+       (O.BlobObj b) -> throwError "Expecting tree, but received blob"
 
     where
       handleEntries [] = return ()
@@ -207,17 +220,19 @@ instance RepoMonad (RepoState) where
           O.TBlob -> do
              ro <- readObjectFromFile oId
              case ro of
-                   (O.BlobObj b') -> do
-                                     liftIO $ C.writeFile (C.unpack oName) (O.content b') 
-                                     handleEntries es
-                   _              -> throwError "Found another object instead of blob"
+                 (O.BlobObj b') -> do
+                   liftIO $ C.writeFile (C.unpack oName) (O.content b') 
+                   handleEntries es
+                 _              -> 
+                   throwError "Found another object instead of blob"
 
 
   getRepo = ask
 
   setHead b ref = do
     r <- getRepo
-    liftIO $ C.writeFile (r ++ "/.hit/" ++ "HEAD") (C.pack ("refs: refs/heads/" ++ b))
+    liftIO $ C.writeFile (r ++ "/.hit/" ++ "HEAD") 
+              (C.pack ("refs: refs/heads/" ++ b))
 
   updateBranchRef b cId = do
     r <- getRepo
@@ -242,7 +257,7 @@ instance RepoMonad (RepoState) where
       branch <- liftIO $ C.readFile headFile
       let maybePath = C.stripPrefix (C.pack "refs: ") branch
       case maybePath of 
-        Just p  -> return $ C.pack $ r ++ ".hit/" ++ (C.unpack p)
+        Just p  -> return $ C.pack $ r ++ ".hit/" ++ C.unpack p
         Nothing -> throwError "Malformed HEAD file"
     else throwError "HEAD file does not exist"
 
@@ -253,13 +268,13 @@ instance RepoMonad (RepoState) where
     if exists then do
       branches <- liftIO $ listDirectory (r ++ "/.hit/refs/heads")
       addRefs branches ref
-    else throwError $ "refs/heads does not exist, no new refs added to store"
+    else throwError "refs/heads does not exist, no new refs added to store"
     where
         addRefs [] ref     = return ref
         addRefs (b:bs) ref = do
-                           r <- getRepo
-                           id <- liftIO $ C.readFile (r ++ "/.hit/refs/heads/" ++ b)
-                           addRefs bs (OS.addRef ref (C.pack b) id)
+           r <- getRepo
+           id <- liftIO $ C.readFile (r ++ "/.hit/refs/heads/" ++ b)
+           addRefs bs (OS.addRef ref (C.pack b) id)
   
   repomappend x y = mappend <$> x <*> y 
 
@@ -289,7 +304,7 @@ createEmptyRepo = do
   where folders repo = [repo ++ "/.hit/objects", repo ++ "/.hit/refs/heads"]
 
 branchBuilder r b = 
-  if isPrefixOf (r ++ ".hit/refs/heads/") b then
+  if (r ++ ".hit/refs/heads/") `isPrefixOf` b then
     b
   else
     r ++ "/.hit/refs/heads/" ++ b
