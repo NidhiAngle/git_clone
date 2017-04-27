@@ -12,7 +12,8 @@ import qualified Data.ByteString.Char8 as C
 import RepoMonad as RM  
 import Data.List (sortBy)
 
-
+-- | Implements the git diff functionality for objects as
+-- | well as text files
 
 class MyDiff a where
     diff :: (RepoMonad b, MonadIO b) => a -> a -> b String
@@ -103,7 +104,8 @@ instance MyDiff O.ObjectId where
      o2 <- readObjectFromFile id2
      diff o1 o2
 
--- -------------------
+-- | Helper function to display an entry type well 
+
 display :: RepoMonad m => String -> ObjectId -> C.ByteString -> m String 
 display str id name = do
   obj <- readObjectFromFile id
@@ -117,5 +119,7 @@ display str id name = do
     (CommitObj commit) -> 
       return "\nWhy is a commit a tree entry?"
 
+
 chopId :: String -> String
 chopId (a:(b:(c:(d:(e:es))))) = a:(b:(c:(d:[e])))    
+chopId x = x

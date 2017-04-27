@@ -34,6 +34,10 @@ initialize ref = do
     createEmptyRepo             
     return ref
 
+-- | commitPrep and mprep called to handle commits and merges respectively
+
+commitPrep :: RM.RepoMonad m => (O.Object -> m O.ObjectId)
+     -> OS.RefStore -> String -> m (OS.RefStore, O.ObjectId)
 commitPrep f refMap msg = do 
   refMap'    <- RM.readRefs refMap
   head       <- RM.getHeadRef
@@ -43,6 +47,7 @@ commitPrep f refMap msg = do
 --  return (refMap' , commitId)
   return (OS.addRef refMap' bname commitId, commitId)
 
+mprep:: String -> OS.RefStore -> ReaderT OS.Repo (ExceptT String IO) ()
 mprep b2 rs= do
   path <- RM.getHeadRef
   let b1 = takeFileName (C.unpack path)

@@ -26,6 +26,9 @@ import Data.Attoparsec.ByteString.Char8 as PB
 import Data.Map as Map
 import System.Directory (doesDirectoryExist)
 
+-- | The refstore maps branch names to their
+-- | commit ids
+
 type RefStore  = Map Ref O.ObjectId
 type Ref = C.ByteString
 type Repo = String
@@ -43,15 +46,17 @@ lookupRef = Map.lookup
 
 createRef :: RefStore
 createRef = Map.empty 
--- Given the name of the repository and id, this gives you the filepath
+
+-- | Given the name of the repository and id, this gives you the filepath
+
 getObjPath :: Repo -> O.ObjectId -> FilePath
 getObjPath r o = r </> ".hit" </> "objects"  </> Prelude.take 2 (C.unpack o) </> Prelude.drop 2 (C.unpack o)
 
 hexSha256 :: ByteString -> ByteString
 hexSha256 bs = digestToHexByteString (hash bs :: Digest SHA256)
 
--- Given object, adds header and hashes to give
--- id and new content
+-- | Given object, adds header and hashes to give
+-- | id and new content
 
 hashContent :: O.Object-> (O.ObjectId, C.ByteString)
 hashContent obj = do
@@ -66,7 +71,8 @@ hashContent obj = do
       getHeader (O.BlobObj _) l   = createHeader "blob" l 
       createHeader objectType l = C.pack (objectType ++ " ") `C.append` C.pack (l ++ "\0")
 
--- Consolidates a object type to a bytestring
+-- | Consolidates an object type to a bytestring
+
 objToByte :: O.Object -> C.ByteString
 objToByte (O.CommitObj c) = O.toLineCommit c
 objToByte (O.TreeObj t)   = O.toLineTree t
