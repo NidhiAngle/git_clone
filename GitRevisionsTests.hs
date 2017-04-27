@@ -28,6 +28,7 @@ main = do
   return ()
 
 {-
+Taken from https://git-scm.com/docs/gitrevisions
 Tree test structure
 G   H   I   J
  \ /     \ /

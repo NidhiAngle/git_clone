@@ -1,3 +1,4 @@
+-- | Handles user input to update the hit version control system
 module IOInterface where
 
 import qualified Objects as O
@@ -16,63 +17,6 @@ import Merge as M
 import MyDiff as D
 
  
-createEmptyRepo :: (RM.RepoMonad m, MonadIO m) => m ()
-createEmptyRepo = do
-  repo <- RM.getRepo
-  liftIO $ Prelude.mapM_ (createDirectoryIfMissing True) (folders repo)
-  liftIO $ Prelude.writeFile (repo ++ "/.hit/HEAD") "refs: refs/heads/master"
-  return ()
-  where folders repo = [repo ++ "/.hit/objects", repo ++ "/.hit/refs/heads"]
-
-initialize ::  (RM.RepoMonad m, MonadIO m) => OS.RefStore -> m OS.RefStore
-initialize ref = do
-  r <- RM.getRepo
-  dexists <- liftIO $ doesDirectoryExist (r ++ "/.hit") 
-  if dexists then 
-    RM.readRefs ref
-  else do
-    createEmptyRepo             
-    return ref
-
--- | commitPrep and mprep called to handle commits and merges respectively
-
-commitPrep :: RM.RepoMonad m => (O.Object -> m O.ObjectId)
-     -> OS.RefStore -> String -> m (OS.RefStore, O.ObjectId)
-commitPrep f refMap msg = do 
-  refMap'    <- RM.readRefs refMap
-  head       <- RM.getHeadRef
-  let bname = C.pack (takeFileName (C.unpack head)) 
-  commitId   <- RM.commit f [head] (C.pack "Brendon") (C.pack msg)
-  RM.updateBranchRef (C.unpack head) commitId
---  return (refMap' , commitId)
-  return (OS.addRef refMap' bname commitId, commitId)
-
-mprep:: String -> OS.RefStore -> ReaderT OS.Repo (ExceptT String IO) ()
-mprep b2 rs= do
-  path <- RM.getHeadRef
-  let b1 = takeFileName (C.unpack path)
-  case (OS.lookupRef (C.pack b1) rs, OS.lookupRef (C.pack b2) rs) of
-    (Just i1, Just i2) -> do 
-          i3 <- M.merger i1 i2
-          _  <- RM.updateBranchRef b1 i3
-          _  <- RM.switchToBranch b1
-          return ()
-    (_,_)  -> throwError "Couldnt find the branch id!"
-
-initRef :: OS.Repo -> IO OS.RefStore
-initRef repo = do
-  let ref = OS.createRef
-  rs <- runExceptT $ runReaderT (RM.readRefs ref :: 
-                                     RM.RepoState OS.RefStore) repo
-  case rs of 
-    Right rs' -> return rs'
-    Left _ -> return ref
-
-findRepoPath :: FilePath
-findRepoPath = "./"
-
-getBranchName :: IO String
-getBranchName = putStr "Enter branch name: " >> getLine
 
 userInterface :: String -> IO ()
 userInterface repo = do 
@@ -95,9 +39,12 @@ userInterface repo = do
       "commit" -> do
                   putStr "Please enter a commit message: " 
                   msg    <- getLine 
+                  putStr "Author name: "
+                  a <- getLine
+                  let author = C.pack a
                   c <- runExceptT $ 
                          runReaderT 
-                           (commitPrep RM.writeObjectToFile rs msg ::
+                           (commitPrep RM.writeObjectToFile rs msg author ::
                              RM.RepoState (OS.RefStore, O.ObjectId)) 
                            repo
                   case c of
@@ -177,4 +124,60 @@ userInterface repo = do
       "exit"     -> void (print rs)
       "ref"      -> print rs >> go rs
       _          -> Prelude.putStrLn "Unrecognized command" >> go rs
+
+
+createEmptyRepo :: (RM.RepoMonad m, MonadIO m) => m ()
+createEmptyRepo = do
+  repo <- RM.getRepo
+  liftIO $ Prelude.mapM_ (createDirectoryIfMissing True) (folders repo)
+  liftIO $ Prelude.writeFile (repo ++ "/.hit/HEAD") "refs: refs/heads/master"
+  return ()
+  where folders repo = [repo ++ "/.hit/objects", repo ++ "/.hit/refs/heads"]
+
+initialize ::  (RM.RepoMonad m, MonadIO m) => OS.RefStore -> m OS.RefStore
+initialize ref = do
+  r <- RM.getRepo
+  dexists <- liftIO $ doesDirectoryExist (r ++ "/.hit") 
+  if dexists then 
+    RM.readRefs ref
+  else do
+    createEmptyRepo             
+    return ref
+
+-- | commitPrep and mprep called to handle commits and merges respectively
+
+commitPrep :: RM.RepoMonad m => (O.Object -> m O.ObjectId)
+     -> OS.RefStore -> String -> RM.Author -> m (OS.RefStore, O.ObjectId)
+commitPrep f refMap msg a = do 
+  refMap'    <- RM.readRefs refMap
+  head       <- RM.getHeadRef
+  let bname = C.pack (takeFileName (C.unpack head)) 
+  commitId   <- RM.commit f [head] a (C.pack msg)
+  RM.updateBranchRef (C.unpack head) commitId
+--  return (refMap' , commitId)
+  return (OS.addRef refMap' bname commitId, commitId)
+
+mprep:: String -> OS.RefStore -> ReaderT OS.Repo (ExceptT String IO) ()
+mprep b2 rs= do
+  path <- RM.getHeadRef
+  let b1 = takeFileName (C.unpack path)
+  case (OS.lookupRef (C.pack b1) rs, OS.lookupRef (C.pack b2) rs) of
+    (Just i1, Just i2) -> do 
+          i3 <- M.merger i1 i2
+          _  <- RM.updateBranchRef b1 i3
+          _  <- RM.switchToBranch b1
+          return ()
+    (_,_)  -> throwError "Couldnt find the branch id!"
+
+initRef :: OS.Repo -> IO OS.RefStore
+initRef repo = do
+  let ref = OS.createRef
+  rs <- runExceptT $ runReaderT (RM.readRefs ref :: 
+                                     RM.RepoState OS.RefStore) repo
+  case rs of 
+    Right rs' -> return rs'
+    Left _ -> return ref
+
+getBranchName :: IO String
+getBranchName = putStr "Enter branch name: " >> getLine
 

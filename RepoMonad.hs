@@ -1,7 +1,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 -- ask about this versus newtype
-
+{- | The typeclass for the hit version control system
+ - | Includes instance for persisting to disk called RepoState
+ -}
 module RepoMonad where
 
 import qualified Codec.Compression.Zlib as Zlib

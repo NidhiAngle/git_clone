@@ -1,5 +1,8 @@
 {-# OPTIONS -fwarn-tabs -fwarn-incomplete-patterns  #-}
-
+{- |
+ - | API similar to gitrevisions for traversing a tree
+ - | and collecting elements given a list of commands.
+ -}
 module GitRevisions (
   revParseTree, 
   Relation(..), 
