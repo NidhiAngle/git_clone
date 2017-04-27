@@ -17,9 +17,12 @@ import System.Directory (createDirectoryIfMissing, listDirectory,
 import System.FilePath (takeDirectory, splitFileName)
 import Data.Functor.Classes
 import Control.Monad.Trans.Reader
+import qualified Objects as O
 import qualified Data.Time.Clock as DT
 import Data.List (isSuffixOf, isPrefixOf)
 import qualified Data.Set as Set
+import Data.Set (Set)
+import qualified GitRevisions as GR
 
 type Author = C.ByteString
 type Message = C.ByteString
@@ -40,7 +43,8 @@ class (Monad m) => RepoMonad m where
    commit :: (O.Object -> m O.ObjectId) -> [OS.Ref] -> Author -> Message -> m O.ObjectId
    extractTreeToDisk :: O.ObjectId -> m ()
    repomappend :: (Monoid a) => m a -> m a -> m a
-
+   getLog :: m (IO ()) 
+   initialize :: OS.RefStore -> m OS.RefStore
 
 type RepoState = ReaderT OS.Repo (ExceptT String IO) 
 
@@ -74,6 +78,29 @@ instance RepoMonad (RepoState) where
     r <- getRepo
     let (path, name, content) = OS.exportObject r o
     return name
+
+  getLog = do 
+    headRef <- getHeadRef
+    cId <- liftIO $ C.readFile (C.unpack headRef)
+    headCommit <- readObjectFromFile cId
+    case headCommit of
+      (O.CommitObj c) -> do
+                         commitLog <- GR.revParseTree [GR.RevId c] getCommitParent 
+                         return $ printLogs commitLog 
+      _               -> return $ putStrLn $ "Not a commit object" ++ 
+                                              C.unpack headRef
+    where
+    printLogs logSet = mapM_ func (Set.toList logSet)
+    func = (\x -> putStrLn (C.unpack (O.toLineCommit x) ++ "\n~~~~"))
+
+  initialize ref = do
+      r <- getRepo
+      dexists <- liftIO $ doesDirectoryExist (r ++ "/.hit") 
+      if dexists then 
+        readRefs ref
+      else do
+        createEmptyRepo             
+        return ref
 
   isWorkingDirectoryDirty = do
     hr  <- getHeadRef
@@ -234,6 +261,30 @@ instance RepoMonad (RepoState) where
   
   repomappend x y = mappend <$> x <*> y 
 
+getCommitParent ::  (RepoMonad m) => O.Commit -> m (Set O.Commit)
+getCommitParent x = 
+  case O.parents x of 
+        [] -> return Set.empty
+        (x:xs) ->
+              if x == C.pack "" -- hacky way to check for base case
+              then return Set.empty else do  
+              singletons <- sequence $ fmap getCommitObject (x:xs)
+              return $ Set.unions singletons
+
+getCommitObject :: (RepoMonad m) => O.ObjectId -> m (Set O.Commit)
+getCommitObject objId = do
+  commitObj <- readObjectFromFile objId  
+  case commitObj of
+    (O.CommitObj c) -> return $ Set.singleton c
+    _ -> return Set.empty
+
+createEmptyRepo :: (RepoMonad m, MonadIO m) => m ()
+createEmptyRepo = do
+  repo <- getRepo
+  liftIO $ Prelude.mapM_ (createDirectoryIfMissing True) (folders repo)
+  liftIO $ Prelude.writeFile (repo ++ "/.hit/HEAD") "refs: refs/heads/master"
+  return ()
+  where folders repo = [repo ++ "/.hit/objects", repo ++ "/.hit/refs/heads"]
 
 branchBuilder r b = 
   if isPrefixOf (r ++ ".hit/refs/heads/") b then
