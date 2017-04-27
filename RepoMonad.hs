@@ -201,7 +201,9 @@ instance RepoMonad (RepoState) where
       handleEntries [] = return ()
       handleEntries (e@(t, oId, oName):es) = 
         case t of
-          O.TTree -> extractTreeToDisk oId
+          O.TTree -> do
+             extractTreeToDisk oId
+             handleEntries es
           O.TBlob -> do
              ro <- readObjectFromFile oId
              case ro of
