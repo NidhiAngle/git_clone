@@ -17,7 +17,8 @@ import Control.Monad.Except
 import Control.Monad.Trans.Reader
 import System.Directory (createDirectoryIfMissing, listDirectory,
                          doesDirectoryExist,doesFileExist)
-import System.FilePath (splitFileName)
+import System.FilePath (splitFileName, takeFileName)
+import Merge as M
 import MyDiff as D
 
 type Author = C.ByteString
@@ -46,9 +47,11 @@ initialize ref = do
 commitPrep f refMap msg = do 
   refMap'    <- RM.readRefs refMap
   head       <- RM.getHeadRef
+  let bname = C.pack (takeFileName (C.unpack head)) 
   commitId   <- RM.commit f [head] (C.pack "Brendon") (C.pack msg)
   RM.updateBranchRef (C.unpack head) commitId
-  return (refMap', commitId)
+--  return (refMap' , commitId)
+  return (OS.addRef refMap' bname commitId, commitId)
 
 getLog :: (RM.RepoMonad m) => m (IO ())
 getLog = do 
@@ -166,7 +169,7 @@ userInterface repo = do
                     f1 <- getLine
                     putStr "Enter second objectId: "
                     f2 <- getLine
-                    res <- runExceptT (runReaderT (D.diff (C.pack f1) (C.pack f2)) "./test")
+                    res <- runExceptT (runReaderT (D.diff (C.pack f1) (C.pack f2)) repo)
                     case res of
                       Right str -> putStrLn str >> go rs
                       Left  str -> putStrLn str >> go rs 
@@ -175,9 +178,31 @@ userInterface repo = do
                     f1 <- getLine
                     putStr "Enter second file: "
                     f2 <- getLine
-                    res <- runExceptT (runReaderT (D.diff f1 f2) "./test")
+                    res <- runExceptT (runReaderT (D.diff f1 f2) repo)
                     case res of
                       Right str -> putStrLn str >> go rs
-                      Left  str -> putStrLn str >> go rs 
-      "exit"   -> return ()
-      _        -> Prelude.putStrLn "Unrecognized command" >> go rs
+                      Left  str -> putStrLn str >> go rs
+      "merge"    -> do
+                    putStr "Enter branch to merge with: " 
+                    b2 <- getLine
+                    r1 <- runExceptT (runReaderT (mprep b2 rs) repo)
+                    case r1 of
+                      Right _ -> go rs
+                      Left str -> putStrLn str >> go rs 
+      "exit"     -> (putStrLn . show) rs >> return ()
+      "ref"      -> (putStrLn . show) rs >> go rs
+      _          -> Prelude.putStrLn "Unrecognized command" >> go rs
+
+
+mprep b2 rs= do
+  path <- RM.getHeadRef
+  let b1 = takeFileName (C.unpack path)
+  case (OS.lookupRef (C.pack b1) rs, OS.lookupRef (C.pack b2) rs) of
+    (Just i1, Just i2) -> do 
+          i3 <- (M.merger i1 i2)
+          _  <- RM.updateBranchRef b1 i3
+          _  <- RM.switchToBranch b1
+          return ()
+    (Nothing, Just a)  -> throwError $ show b1
+    (Just a, Nothing)  -> throwError $ "blah2"
+    (Nothing, Nothing)  -> throwError $ "blah"

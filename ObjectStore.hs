@@ -38,7 +38,7 @@ addRef refs branch objId = Map.insert branch objId refs
 getRefs :: RefStore -> [(C.ByteString, O.ObjectId)]
 getRefs = Map.toList
 
-lookupRef :: C.ByteString -> RefStore -> Maybe Ref
+lookupRef :: C.ByteString -> RefStore -> Maybe O.ObjectId
 lookupRef = Map.lookup
 
 createRef :: RefStore

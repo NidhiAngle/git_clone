@@ -13,7 +13,8 @@ import MyDiff as D
 import Control.Monad.Trans.Reader
 import Control.Monad
 import Control.Monad.Except
-
+import System.Directory 
+import Merge
 
 commit1 = makeCommit [(C.pack "PARENT1"), (C.pack "PARENT2")] (C.pack "TREE") (C.pack "AUTHOR") (C.pack "MSG") ((read "2011-11-19 18:28:52 UTC")::DT.UTCTime)
 tree1 = makeTree (C.pack "tree1") [(O.makeBlobEntryType, (C.pack "BLOB1"), (C.pack "first")), (O.makeBlobEntryType, (C.pack "BLOB2")
@@ -34,6 +35,32 @@ blob4 = makeBlob $ C.pack "LINECHANGED2"
 blob5 = makeBlob $ C.pack "LINE1"
 blob6 = makeBlob $ C.pack "LINE1\nLINE3"
 
+(i2,a) = OS.hashContent blob2
+(i3,b) = OS.hashContent blob3
+(i4,c) = OS.hashContent blob4
+(i5,d) = OS.hashContent blob5
+(i6,e) = OS.hashContent blob6
+tree2  = makeTree (C.pack "tree2") [(O.makeBlobEntryType, i2, C.pack "blob2")]
+tree4  = makeTree (C.pack "tree4") [(O.makeBlobEntryType, i4, C.pack "blob2")]
+tree3  = makeTree (C.pack "tree3") [(O.makeBlobEntryType, i2, C.pack "alsoblob2")]
+(t2,g) = OS.hashContent tree2
+(t4,h) = OS.hashContent tree4
+tree5  = makeTree (C.pack "tree5") [(O.makeBlobEntryType, i2, C.pack "blob2"),
+                                    (O.makeBlobEntryType, i3, C.pack "blob5"),
+                                    (O.makeBlobEntryType, i5, C.pack "blob4"),
+                                    (O.makeTreeEntryType, t2, C.pack "tree2")]
+    
+tree6  = makeTree (C.pack "tree6") [(O.makeBlobEntryType, i2, C.pack "blob2"),
+                                    (O.makeBlobEntryType, i3, C.pack "blob3"),
+                                    (O.makeBlobEntryType, i4, C.pack "blob4"),
+                                    (O.makeTreeEntryType, t4, C.pack "tree2"),
+                                    (O.makeTreeEntryType, t2, C.pack "treex")]
+(t5,i) = OS.hashContent tree5
+(t6,j) = OS.hashContent tree6
+commit2 = makeCommit [C.pack "PID1"] t5 (C.pack "auth") (C.pack "mesg") ((read "2011-11-19 18:28:52 UTC")::DT.UTCTime)
+commit3 = makeCommit [C.pack "PID2"] t6 (C.pack "AUTH") (C.pack "mesg") ((read "2011-11-19 18:28:52 UTC")::DT.UTCTime)
+
+
 -- tree1 = makeTree $ [(O.makeTreeEntryType), ]
 -- exportObject :: Monad m => Repo -> O.Object -> (m FilePath,m FilePath, m C.ByteString)
 third :: (FilePath,O.ObjectId, C.ByteString) -> C.ByteString
@@ -42,31 +69,7 @@ third (a,b,c) = c
 --beforeTests
 
 finalTest = do
-  _ <- runExceptT (runReaderT (RM.writeObjectToFile blob2 :: RepoState O.ObjectId) "./test/")
-  _ <- runExceptT (runReaderT (RM.writeObjectToFile blob4 :: RepoState O.ObjectId) "./test/")
-  
   let 
-    (i2,a) = OS.hashContent blob2
-    (i3,b) = OS.hashContent blob3
-    (i4,c) = OS.hashContent blob4
-    (i5,d) = OS.hashContent blob5
-    (i6,e) = OS.hashContent blob6
-    tree2  = makeTree (C.pack "tree2") [(O.makeBlobEntryType, i2, C.pack "blob2")]
-    tree4  = makeTree (C.pack "tree4") [(O.makeBlobEntryType, i4, C.pack "blob2")]
-    tree3  = makeTree (C.pack "tree3") [(O.makeBlobEntryType, i2, C.pack "alsoblob2")]
-    (t2,g) = OS.hashContent tree2
-    (t4,h) = OS.hashContent tree4
-    tree5  = makeTree (C.pack "tree5") [(O.makeBlobEntryType, i2, C.pack "blob2"),
-                         (O.makeBlobEntryType, i3, C.pack "blob5"),
-                         (O.makeBlobEntryType, i5, C.pack "blob4"),
-                         (O.makeTreeEntryType, t2, C.pack "tree2")]
-    
-    tree6  = makeTree (C.pack "tree6") [(O.makeBlobEntryType, i2, C.pack "blob2"),
-                         (O.makeBlobEntryType, i3, C.pack "blob3"),
-                         (O.makeBlobEntryType, i4, C.pack "blob4"),
-                         (O.makeTreeEntryType, t4, C.pack "tree2"),
-                         (O.makeTreeEntryType, t2, C.pack "treex")]
-  
     x = [(~?=) <$> (getDiff (diff blob2 blob3)) <*> return s1,
          (~?=) <$> (getDiff (diff blob2 blob4)) <*> return s2,
          (~?=) <$> (getDiff (diff blob2 blob5)) <*> return s3,
@@ -77,12 +80,22 @@ finalTest = do
          (~?=) <$> (getDiff (diff tree5 tree6)) <*> return s8,
          (~?=) <$> (getDiff (diff tree5 tree2)) <*> return s9,
          (~?=) <$> (getDiff (diff tree5 tree4)) <*> return s0]
+  _ <- runExceptT (runReaderT (RM.writeObjectToFile blob2 
+                                 :: RepoState O.ObjectId) "./test/")
+  _ <- runExceptT (runReaderT (RM.writeObjectToFile blob4 
+                                 :: RepoState O.ObjectId) "./test/")
   _ <- runExceptT (runReaderT (RM.writeObjectToFile tree2 
                                  :: RepoState O.ObjectId) "./test/")
   _ <- runExceptT (runReaderT (RM.writeObjectToFile tree4 
                                  :: RepoState O.ObjectId) "./test/")
+  _ <- runExceptT (runReaderT (RM.writeObjectToFile tree5 
+                                 :: RepoState O.ObjectId) "./test/")
+  _ <- runExceptT (runReaderT (RM.writeObjectToFile tree6 
+                                 :: RepoState O.ObjectId) "./test/")
   _ <- ((sequence x) >>= (\x -> runTestTT (TestList x)))
   _ <- runTestTT (TestList [importObjectTests, exportObjectTests])
+  _ <- (getMerge (merge tree5 tree6)) >>= Prelude.putStrLn 
+  _ <- removeDirectoryRecursive "./test"
   return ()
 
 s1 = "\nBlob 1:94323\nBlob 2:94323\n\n"
@@ -102,6 +115,14 @@ getDiff x = do
   case res of
     Right s -> return s
     Left  s -> return s
+
+getMerge :: RepoState O.Object -> IO String
+getMerge x = do
+  res <- runExceptT (runReaderT x "./test") 
+  case res of
+    Right s -> return $ show s
+    Left  s -> return s
+
 
 importObjectTests = TestList [
   readObject commitStr ~?= Just commit1,

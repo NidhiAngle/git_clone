@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+module Merge where
 import Data.List (sortBy)
 import ObjectStore as OS
 import Objects as O
@@ -12,11 +13,6 @@ import Data.Set
 import qualified Data.Time.Clock as DT
 
 
-blob2 = makeBlob $ C.pack "LINE1\nLINE2"
-blob3 = makeBlob $ C.pack "LINE1\nLINE2"
-blob4 = makeBlob $ C.pack "LINE1\nLINECHANGED2"
-blob5 = makeBlob $ C.pack "LINE1"
-blob6 = makeBlob $ C.pack "LINE1\nLINE2\nLINE3"
 
 class Merge a where
   merge :: (RepoMonad b, MonadIO b) => a -> a -> b a
@@ -117,4 +113,15 @@ instance Merge [Char] where
      where helperMerge str diff = case diff of
                                     First  x -> str ++ "\nFIRST: " ++ x
                                     Second x -> str ++ "\nSECOND: "++ x
-                                    Both x y -> str ++ "\n" ++ x      
+                                    Both x y -> str ++ "\n" ++ x
+
+merger :: ObjectId -> ObjectId -> RepoState ObjectId
+merger id1 id2 = do
+       o1 <- readObjectFromFile id1
+       o2 <- readObjectFromFile id2
+       case (o1, o2) of
+         (CommitObj a, CommitObj b) -> do
+           o3 <- merge o1 o2
+           let (i, x) = hashContent o3
+           return i
+         (_, _) -> throwError "Cannot merge non branches!"
