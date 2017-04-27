@@ -1,31 +1,21 @@
 module IOInterface where
 
 import qualified Objects as O
-import qualified Codec.Compression.Zlib as Zlib
 import qualified Data.ByteString.Lazy as B
 import qualified ObjectStore as OS
 import qualified Data.ByteString.Char8 as C
-import qualified GitRevisions as GR
 import qualified RepoMonad as RM
-import Data.List (sortOn)
 import Data.Set (Set)
 import qualified Data.Set as Set
-import qualified Data.Time.Clock as DT
-import qualified Data.Time.Format as DTF
 import Control.Monad 
 import Control.Monad.Except
 import Control.Monad.Trans.Reader
-import System.Directory (createDirectoryIfMissing, listDirectory,
-                         doesDirectoryExist,doesFileExist)
+import System.Directory (createDirectoryIfMissing,doesDirectoryExist)
 import System.FilePath (splitFileName, takeFileName)
 import Merge as M
 import MyDiff as D
 
-type Author = C.ByteString
-type Message = C.ByteString
  
-
-
 createEmptyRepo :: (RM.RepoMonad m, MonadIO m) => m ()
 createEmptyRepo = do
   repo <- RM.getRepo
@@ -53,37 +43,6 @@ commitPrep f refMap msg = do
 --  return (refMap' , commitId)
   return (OS.addRef refMap' bname commitId, commitId)
 
-getLog :: (RM.RepoMonad m) => m (IO ())
-getLog = do 
-  headRef <- RM.getHeadRef
-  headCommit <- RM.readObjectFromFile headRef
-  case headCommit of
-    (O.CommitObj c) -> do
-                       commitLog <- GR.revParseTree [GR.RevId c] getCommitParent 
-                       return $ printLogs commitLog 
-    _               -> return $ putStrLn $ "Not a commit object" ++ 
-                                            C.unpack headRef
-  where
-  printLogs logSet = mapM_ func (Set.toList logSet)
-  func = (\x -> putStrLn (C.unpack (O.toLineCommit x) ++ "\n~~~~"))
-
-getCommitParent ::  (RM.RepoMonad m) => O.Commit -> m (Set O.Commit)
-getCommitParent x = 
-  case O.parents x of 
-        [] -> return Set.empty
-        (x:xs) ->
-              if x == C.pack "" -- hacky way to check for base case
-              then return Set.empty else do  
-              singletons <- sequence $ fmap getCommitObject (x:xs)
-              return $ Set.unions singletons
-
-    
-getCommitObject :: (RM.RepoMonad m) => O.ObjectId -> m (Set O.Commit)
-getCommitObject objId = do
-  commitObj <- RM.readObjectFromFile objId  
-  case commitObj of
-    (O.CommitObj c) -> return $ Set.singleton c
-    _ -> return Set.empty
 
 initRef :: OS.Repo -> IO OS.RefStore
 initRef repo = do
@@ -126,7 +85,7 @@ userInterface repo = do
                         putStrLn ("Commit ID: " ++ C.unpack c') >> go refMap'
                     Left e -> putStrLn e >> go rs
       "log"    -> do 
-                  log <- runExceptT $ runReaderT (getLog :: 
+                  log <- runExceptT $ runReaderT (RM.getLog :: 
                                                   RM.RepoState (IO ())) repo 
                   let msg = case log of 
                               Right log' -> log'
@@ -203,6 +162,4 @@ mprep b2 rs= do
           _  <- RM.updateBranchRef b1 i3
           _  <- RM.switchToBranch b1
           return ()
-    (Nothing, Just a)  -> throwError $ show b1
-    (Just a, Nothing)  -> throwError $ "blah2"
-    (Nothing, Nothing)  -> throwError $ "blah"
+    (_,_)  -> throwError $ "Couldnt find the branch id!"
