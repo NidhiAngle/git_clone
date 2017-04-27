@@ -1,7 +1,46 @@
-GIT CLONE
+hit Version Control System
+--------------------------
+
+Authors
+-------
+Nidhi Angle (vnidhi)
+Brendon Lavernia (lavernia)
 
 Dependencies
+------------
 cabal install cryptohash
 cabal install attoparsec
 cabal install zlib
 cabal install Diff
+
+Running Instructions
+--------------------
+ghc -o Main --make Main.hs
+ghci Main.hs
+
+Will not run as a binary, must be run with ghci
+
+File Overview
+-------------
+IOInterface: Handles simple user input and calls appropriate functions from 
+             RepoMonad. 
+
+RepoMonad: A typeclass that encapsulates all interactions with the hit version 
+           control repo. Since our implementation of hit stores files to disk, 
+           an instance of the typeclass was made called RepoState, which defines 
+           the necessary IO operations to interact with the ObjectStore. Also 
+           relies on GitRevisions for some tree traversals.
+
+ObjectStore: Writes and retrieves hit objects to/from disk. Tracks where objects 
+             are located and keeps updated in RefStore. 
+
+Objects: Defines all the data types of the hit program
+
+GitRevisions: A functional algorithm for traversing and retrieving elements from 
+              a tree, similar to git’s api. 
+
+MyDiff: Compares objects from the hit repo and returns the lines that differ.
+
+Merge: Merges two commit objects into one new commit object and writes the new 
+       files to the working directory.  
+
