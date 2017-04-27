@@ -23,9 +23,10 @@ module Objects (
   ,makeTreeEntryType
   ,getTreeFromCommit
   ,getEntries
-  ,getEType
-  ,getEId
-  ,getEName
+  ,getTreeName
+  ,getAuthor
+  ,getTree
+  ,getParents
 ) where 
 import qualified Data.ByteString.Char8 as C
 import qualified Data.Attoparsec.ByteString.Char8 as PB
@@ -81,15 +82,27 @@ data Blob = Blob{
  content :: C.ByteString
 } deriving (Eq, Show)
 
+getAuthor :: Commit -> C.ByteString
+getAuthor = author
+
+getTree :: Commit -> ObjectId
+getTree = tree
+
+getParents :: Commit -> [ObjectId]
+getParents = parents
+
 getTreeFromCommit :: Commit -> ObjectId
 getTreeFromCommit = tree 
 
 getEntries :: Tree -> [TreeEntry]
 getEntries = entries
 
-getEType (et,ei,en) = et
-getEId (et,ei,en)   = ei
-getEName (et,ei,en) = en
+getTreeName :: Tree -> C.ByteString
+getTreeName = name
+
+-- getEType (et,ei,en) = et
+-- getEId (et,ei,en)   = ei
+-- getEName (et,ei,en) = en
 
 makeCommit :: [ObjectId]-> ObjectId -> C.ByteString -> C.ByteString -> DT.UTCTime -> Object
 makeCommit ps n a m t= CommitObj $ Commit ps n a m t

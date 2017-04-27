@@ -103,6 +103,7 @@ instance MyDiff O.ObjectId where
      diff o1 o2
 
 -- -------------------
+display :: RepoMonad m => [Char] -> ObjectId -> C.ByteString -> m [Char]
 display str id name = do
   obj <- readObjectFromFile id
   case obj of 
@@ -115,4 +116,5 @@ display str id name = do
     (CommitObj commit) -> do
       return "\nWhy is a commit a tree entry?"
 
+chopId :: String -> String
 chopId (a:(b:(c:(d:(e:es))))) = a:(b:(c:(d:[e])))    
