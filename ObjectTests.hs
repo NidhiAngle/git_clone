@@ -94,7 +94,7 @@ finalTest = do
                                  :: RepoState O.ObjectId) "./test/")
   _ <- ((sequence x) >>= (\x -> runTestTT (TestList x)))
   _ <- runTestTT (TestList [importObjectTests, exportObjectTests])
-  _ <- (getMerge (merge tree5 tree6)) >>= Prelude.putStrLn 
+  --_ <- (getMerge (merge tree5 tree6)) >>= Prelude.putStrLn 
   _ <- removeDirectoryRecursive "./test"
   return ()
 

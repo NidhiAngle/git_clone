@@ -1,2 +1,4 @@
 .hit/
 **/*.DS_Store
+*.hi
+*.o
