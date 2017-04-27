@@ -6,9 +6,11 @@ module Objects (
    Object(..)
   ,ObjectId
   ,ObjectName
-  ,EntryType
+  ,EntryType(TTree, TBlob)
   ,TreeEntry
   ,Commit(parents, dateTime, tree)
+  ,Blob(content)
+  ,Tree(name, entries)
   ,makeCommit
   ,makeTree-- COMMENT OUT LATER
   ,makeBlob-- COMMENT OUT LATER

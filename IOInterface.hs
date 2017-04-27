@@ -6,7 +6,7 @@ import qualified Data.ByteString.Lazy as B
 import qualified ObjectStore as OS
 import qualified Data.ByteString.Char8 as C
 import qualified GitRevisions as GR
-import RepoMonad
+import qualified RepoMonad as RM
 import Data.List (sortOn)
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -25,36 +25,35 @@ type Message = C.ByteString
  
 
 
-createEmptyRepo :: (RepoMonad m, MonadIO m) => m ()
+createEmptyRepo :: (RM.RepoMonad m, MonadIO m) => m ()
 createEmptyRepo = do
-  repo <- getRepo
+  repo <- RM.getRepo
   liftIO $ Prelude.mapM_ (createDirectoryIfMissing True) (folders repo)
   liftIO $ Prelude.writeFile (repo ++ "/.hit/HEAD") "refs: refs/heads/master"
   return ()
   where folders repo = [repo ++ "/.hit/objects", repo ++ "/.hit/refs/heads"]
 
-initialize ::  (RepoMonad m, MonadIO m) => OS.RefStore -> m OS.RefStore
+initialize ::  (RM.RepoMonad m, MonadIO m) => OS.RefStore -> m OS.RefStore
 initialize ref = do
-  r <- getRepo
+  r <- RM.getRepo
   dexists <- liftIO $ doesDirectoryExist (r ++ "/.hit") 
   if dexists then 
-    readRefs ref
+    RM.readRefs ref
   else do
     createEmptyRepo             
     return ref
 
 commitPrep f refMap msg = do 
-  refMap'  <- readRefs refMap
-  head     <- getHeadRef
-  commitId <- commit f [head] (C.pack "Brendon") (C.pack msg)
-  setHdres <- setHead "master" commitId
+  refMap'    <- RM.readRefs refMap
+  head       <- RM.getHeadRef
+  commitId   <- RM.commit f [head] (C.pack "Brendon") (C.pack msg)
+  RM.updateBranchRef (C.unpack head) commitId
   return (refMap', commitId)
 
-
-getLog :: (RepoMonad m) => m (IO ())
+getLog :: (RM.RepoMonad m) => m (IO ())
 getLog = do 
-  headRef <- getHeadRef
-  headCommit <- readObjectFromFile headRef
+  headRef <- RM.getHeadRef
+  headCommit <- RM.readObjectFromFile headRef
   case headCommit of
     (O.CommitObj c) -> do
                        commitLog <- GR.revParseTree [GR.RevId c] getCommitParent 
@@ -65,7 +64,7 @@ getLog = do
   printLogs logSet = mapM_ func (Set.toList logSet)
   func = (\x -> putStrLn (C.unpack (O.toLineCommit x) ++ "\n~~~~"))
 
-getCommitParent ::  (RepoMonad m) => O.Commit -> m (Set O.Commit)
+getCommitParent ::  (RM.RepoMonad m) => O.Commit -> m (Set O.Commit)
 getCommitParent x = 
   case O.parents x of 
         [] -> return Set.empty
@@ -76,18 +75,18 @@ getCommitParent x =
               return $ Set.unions singletons
 
     
-getCommitObject :: (RepoMonad m) => O.ObjectId -> m (Set O.Commit)
+getCommitObject :: (RM.RepoMonad m) => O.ObjectId -> m (Set O.Commit)
 getCommitObject objId = do
-  commitObj <- readObjectFromFile objId  
+  commitObj <- RM.readObjectFromFile objId  
   case commitObj of
     (O.CommitObj c) -> return $ Set.singleton c
     _ -> return Set.empty
 
-initRef :: IO OS.RefStore
-initRef = do
+initRef :: OS.Repo -> IO OS.RefStore
+initRef repo = do
   let ref = OS.createRef
-  rs <- runExceptT $ runReaderT (readRefs ref :: 
-                                     RepoState OS.RefStore) findRepoPath
+  rs <- runExceptT $ runReaderT (RM.readRefs ref :: 
+                                     RM.RepoState OS.RefStore) repo
   case rs of 
     Right rs' -> return rs'
     Left _ -> return ref
@@ -95,9 +94,12 @@ initRef = do
 findRepoPath :: FilePath
 findRepoPath = "./"
 
-userInterface :: IO ()
-userInterface = do 
-  rs <- initRef
+getBranchName :: IO String
+getBranchName = putStr "Enter branch name: " >> getLine
+
+userInterface :: String -> IO ()
+userInterface repo = do 
+  rs <- initRef repo
   go rs
   where
   go :: OS.RefStore -> IO()
@@ -106,61 +108,59 @@ userInterface = do
     str <- liftIO  Prelude.getLine
     case str of
       "init"   -> do
-                  init <- runExceptT $ runReaderT ((initialize rs) :: 
-                                                   RepoState OS.RefStore) findRepoPath
+                  init <- runExceptT $ runReaderT (initialize rs :: 
+                                                   RM.RepoState OS.RefStore) repo
                   case init of 
                     Right rs' -> putStrLn "Initialized hit repo" >> go rs'
                     Left e -> putStrLn e >> go rs
       "commit" -> do
                   putStr "Please enter a commit message: " 
                   msg    <- getLine 
-                  c <- runExceptT $ runReaderT (commitPrep writeObjectToFile rs msg ::
-                                     RepoState (OS.RefStore, O.ObjectId)) findRepoPath
+                  c <- runExceptT $ runReaderT (commitPrep RM.writeObjectToFile rs msg ::
+                                     RM.RepoState (OS.RefStore, O.ObjectId)) repo
                   case c of
                     Right (refMap', c') -> 
                         putStrLn ("Commit ID: " ++ C.unpack c') >> go refMap'
                     Left e -> putStrLn e >> go rs
       "log"    -> do 
                   log <- runExceptT $ runReaderT (getLog :: 
-                                                  RepoState (IO ())) findRepoPath 
+                                                  RM.RepoState (IO ())) repo 
                   let msg = case log of 
                               Right log' -> log'
                               Left e -> putStrLn e
                   msg >> go rs
       "branch" -> do
-                  putStr "Enter branch name: "
-                  branch <- getLine
+                  branch <- getBranchName
                   let branchName = C.pack branch
                   case OS.lookupRef branchName rs of
                     Just _ -> putStrLn (branch ++ " already exists") >> go rs 
                     Nothing -> do
-                      ab <- runExceptT $ runReaderT (addBranch branch ::
-                                                     RepoState OS.Ref) "./"
+                      ab <- runExceptT $ runReaderT (RM.addBranch branch ::
+                                                     RM.RepoState OS.Ref) repo
                       case ab of
                         Right hr -> do 
                           let rs' = OS.addRef rs branchName hr 
                           putStrLn ("Successfully created " ++ branch) >> go rs'
                         Left e  -> putStrLn e >> go rs
       "checkout" -> do
-                    putStr "Enter branch name: "
-                    branch <- getLine
+                    branch <- getBranchName
                     let branchName = C.pack branch
                     case OS.lookupRef branchName rs of
                       Just id -> do
-                         b <- runExceptT $ runReaderT (isWorkingDirectoryDirty ::
-                                                      RepoState Bool) findRepoPath
+                         b <- runExceptT $ runReaderT (RM.isWorkingDirectoryDirty ::
+                                                      RM.RepoState Bool) repo
                          case b of 
                            Right dirty ->
                              if not dirty then do
-                               co <- runExceptT $ runReaderT (switchToBranch id :: 
-                                                             RepoState (IO ())) findRepoPath
+                               co <- runExceptT $ runReaderT (RM.switchToBranch branch :: 
+                                                             RM.RepoState ()) repo
                                case co of 
-                                 Right co' -> co' >> go rs
+                                 Right _ -> go rs
                                  Left e -> putStrLn e >> go rs  
                              else putStrLn ("Some local files would be overwritten" ++
                                            " in checkout. Please commit first") >> go rs
                            Left e -> putStrLn e >> go rs
-                      Nothing -> putStrLn ("branch " ++ branch ++ " does not exist") >> go rs
+                      Nothing -> putStrLn ("branch " ++ branch ++ " does not exist") >> go rs 
       "diff -o"  -> do
                     putStr "Enter first objectId: " 
                     f1 <- getLine
@@ -179,6 +179,5 @@ userInterface = do
                     case res of
                       Right str -> putStrLn str >> go rs
                       Left  str -> putStrLn str >> go rs 
-      "exit"     -> return ()
-      _          -> Prelude.putStrLn "Unrecognized command" >> go rs
-
+      "exit"   -> return ()
+      _        -> Prelude.putStrLn "Unrecognized command" >> go rs

@@ -26,13 +26,13 @@ import Data.Attoparsec.ByteString.Char8 as PB
 import Data.Map as Map
 import System.Directory (doesDirectoryExist)
 
-type RefStore  = Map C.ByteString O.ObjectId
-type Ref = O.ObjectId 
+type RefStore  = Map Ref O.ObjectId
+type Ref = C.ByteString
 type Repo = String
 type HEAD = String
 type Branch = String
 
-addRef :: RefStore -> C.ByteString -> Ref -> RefStore
+addRef :: RefStore -> Ref -> O.ObjectId -> RefStore
 addRef refs branch objId = Map.insert branch objId refs 
 
 getRefs :: RefStore -> [(C.ByteString, O.ObjectId)]
