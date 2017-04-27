@@ -36,11 +36,9 @@ import Control.Applicative ((<|>))
 import qualified Data.Time.Clock as DT
 import qualified Data.Time.Format as DTF
 
-
--- import Parser as PB
--- import qualified ParserCombinators as PB
---PARSER- BYTES TO STRING TO BYTES TO STORE 
---remove Blob export
+-- | Definition of all the objects including blob, 
+-- | commit, tree their constructors, pretty printer
+-- | and parser
 
 type ObjectId = C.ByteString
 type ObjectName = C.ByteString  
@@ -84,6 +82,7 @@ data Blob = Blob{
  content :: C.ByteString
 } deriving (Eq, Show)
 
+-- | Useful getters
 getAuthor :: Commit -> C.ByteString
 getAuthor = author
 
@@ -102,9 +101,7 @@ getEntries = entries
 getTreeName :: Tree -> C.ByteString
 getTreeName = name
 
--- getEType (et,ei,en) = et
--- getEId (et,ei,en)   = ei
--- getEName (et,ei,en) = en
+-- | Constructors visible to the outside
 
 makeCommit :: [ObjectId]-> ObjectId -> C.ByteString -> C.ByteString -> 
               DT.UTCTime -> Object
@@ -118,6 +115,9 @@ makeBlob = BlobObj . Blob
 
 makeTreeEntryType = TTree
 makeBlobEntryType = TBlob
+
+-- | Parsers and helper functions for the commit, 
+-- | tree and blob
 
 bytestr :: String -> PB.Parser C.ByteString
 bytestr s = PB.string $ C.pack s
@@ -174,7 +174,8 @@ parseBlob = do
   pure $ Blob content
 
 
--- pretty printer for commit objects, for example, to write to files
+-- | pretty printer for commit trees and blobs, for example, to write to files
+
 toLineCommit :: Commit -> C.ByteString
 toLineCommit c = Prelude.foldl (\b x -> b `C.append` helper "parent " x) 
                  (C.pack "") (parents c) 
@@ -188,8 +189,6 @@ toLineCommit c = Prelude.foldl (\b x -> b `C.append` helper "parent " x)
     helper "msg" x    = C.pack "\n" `C.append` x `C.append` C.pack "\n"
     helper str x   = C.pack str `C.append` x `C.append` C.pack "\n"
 
--- pretty printer for tree objects, for example, to write to files
--- put in object?
 toLineTree :: Tree -> C.ByteString 
 toLineTree t = Prelude.foldl helper 
                 (C.pack "name " `C.append` name t `C.append` C.pack "\n") 
@@ -201,7 +200,7 @@ toLineTree t = Prelude.foldl helper
       TTree -> base `C.append` C.pack "tree " `C.append` id `C.append` 
                C.pack " " `C.append` name `C.append` C.pack "\n"
 
--- pretty printer for commit objects, for example, to write to files
+
 toLineBlob :: Blob -> C.ByteString
 toLineBlob = content
 -------------------------------------

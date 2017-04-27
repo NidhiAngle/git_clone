@@ -12,7 +12,7 @@ import Control.Monad.Except
 import Data.Set
 import qualified Data.Time.Clock as DT
 
-
+-- | Implements the git merge functionality for all objects
 
 class Merge a where
   merge :: (RepoMonad b, MonadIO b) => a -> a -> b a
@@ -116,6 +116,8 @@ instance Merge [Char] where
                                     First  x -> str ++ "\nFIRST: " ++ x
                                     Second x -> str ++ "\nSECOND: "++ x
                                     Both x y -> str ++ "\n" ++ x
+
+-- | Function called by IOInterface to only merge commits
 
 merger :: ObjectId -> ObjectId -> RepoState ObjectId
 merger id1 id2 = do
