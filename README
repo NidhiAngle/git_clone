@@ -17,6 +17,19 @@ Running Instructions
 --------------------
 ghc -o Main --make Main.hs
 ghci Main.hs
+ghci > main
+Enter a relative path to wd: ./test/
+Commands are:
+    init - creates .hit folder
+    commit - saves everything in working directory (no staging)
+    log - prints total history for current branch
+    branch - creates new branch
+    checkout - enter branch after prompt
+    diff -o - follow prompt for object ids
+    diff -f - follow prompt for file names
+    merge - follow prompt to enter branch name
+    exit - stops program
+    ref - prints branch names and commit ids
 
 Will not run as a binary, must be run with ghci
 
